@@ -1,0 +1,14 @@
+# Jetbrains config
+.idea
+
+# media_dir
+/media
+
+# database
+db.sqlite3
+
+# pycache
+__pycache__
+
+# environment
+.env
