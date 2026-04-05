@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Issue, IssueCover, IssueSection, Section, Person, Credit
+from .models import Issue, IssueCover, IssueSection, Section, Person, Credit, Magazine
 
 
 class PersonSerializer(serializers.ModelSerializer):
@@ -8,6 +8,10 @@ class PersonSerializer(serializers.ModelSerializer):
         model = Person
         fields = ['id', 'name', ]
 
+class MagazineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Magazine
+        fields = ['name', 'slug']
 
 class IssueCoverSerializer(serializers.ModelSerializer):
     class Meta:
@@ -51,20 +55,32 @@ class IssueSectionSerializer(serializers.ModelSerializer):
 
 class IssueDetailSerializer(serializers.ModelSerializer):
     covers = IssueCoverSerializer(many=True, read_only=True)
+    magazine = MagazineSerializer(read_only=True)
+    magazine_id = serializers.PrimaryKeyRelatedField(
+        queryset=Magazine.objects.all(),
+        source='magazine',
+        write_only=True
+    )
     sections = IssueSectionSerializer(many=True, read_only=True)
 
     class Meta:
         model = Issue
-        fields = ['id', 'publishing_date', 'edition', 'file_path', 'covers', 'sections', ]
+        fields = ['id', 'publishing_date', 'edition', 'file_path', 'magazine', 'magazine_id', 'covers', 'sections', ]
 
 
 class IssueListSerializer(serializers.ModelSerializer):
     covers = IssueCoverSerializer(many=True, read_only=True)
+    magazine = MagazineSerializer(read_only=True)
+    magazine_id = serializers.PrimaryKeyRelatedField(
+        queryset=Magazine.objects.all(),
+        source='magazine',
+        write_only=True
+    )
     is_digital = serializers.SerializerMethodField()
 
     class Meta:
         model = Issue
-        fields = ['id', 'publishing_date', 'edition', 'is_digital', 'covers', ]
+        fields = ['id', 'publishing_date', 'edition', 'is_digital', 'magazine', 'magazine_id', 'covers', ]
 
     @staticmethod
     def get_is_digital(obj):

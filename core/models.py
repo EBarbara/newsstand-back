@@ -7,6 +7,17 @@ from .manager import IssueQuerySet
 
 # Create your models here.
 
+class Magazine(models.Model):
+    name = models.CharField(max_length=255)
+    publisher = models.CharField(max_length=255, null=True, blank=True)
+    language = models.CharField(max_length=255, null=True, blank=True)
+    country = models.CharField(max_length=255, null=True, blank=True)
+    slug = models.SlugField(unique=True, db_index=True)
+    description = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
 class Person(models.Model):
     name = models.CharField(max_length=255, unique=True, verbose_name='Name')
 
@@ -34,6 +45,7 @@ class Section(models.Model):
 class Issue(models.Model):
     objects = IssueQuerySet.as_manager()
 
+    magazine = models.ForeignKey(Magazine, on_delete=models.CASCADE, related_name='issues')
     publishing_date = models.DateField(verbose_name='Publishing Date')
     edition = models.IntegerField(null=True, blank=True, verbose_name='Edition')
     file_path = models.CharField(
@@ -48,7 +60,10 @@ class Issue(models.Model):
         verbose_name = 'Issue'
         verbose_name_plural = 'Issues'
         ordering = ['-publishing_date', '-edition']
-        constraints = [models.UniqueConstraint(fields=['publishing_date', 'edition'], name='unique_issue_per_date_edition')]
+        constraints = [
+            models.UniqueConstraint(fields=['publishing_date', 'edition'], name='unique_issue_per_date_edition'),
+            models.UniqueConstraint(fields=['magazine', 'edition'], name='unique_issue_per_magazine_edition'),
+        ]
 
     def get_path(self) -> Path | None:
         return Path(self.file_path) if self.file_path else None
