@@ -73,7 +73,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'news_back.wsgi.application'
+WSGI_APPLICATION = 'newsstand_back.wsgi.application'
 
 
 # Database

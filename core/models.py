@@ -2,6 +2,8 @@ from pathlib import Path
 
 from django.db import models
 
+from .manager import IssueQuerySet
+
 
 # Create your models here.
 
@@ -11,6 +13,7 @@ class Person(models.Model):
     class Meta:
         verbose_name = 'Person'
         verbose_name_plural = 'People'
+        ordering = ['name']
 
     def __str__(self) -> str:
         return self.name
@@ -22,12 +25,15 @@ class Section(models.Model):
     class Meta:
         verbose_name = 'Section'
         verbose_name_plural = 'Sections'
+        ordering = ['name']
 
     def __str__(self) -> str:
         return self.name
 
 
 class Issue(models.Model):
+    objects = IssueQuerySet.as_manager()
+
     publishing_date = models.DateField(verbose_name='Publishing Date')
     edition = models.IntegerField(null=True, blank=True, verbose_name='Edition')
     file_path = models.CharField(
@@ -41,6 +47,7 @@ class Issue(models.Model):
     class Meta:
         verbose_name = 'Issue'
         verbose_name_plural = 'Issues'
+        ordering = ['-publishing_date', '-edition']
         constraints = [models.UniqueConstraint(fields=['publishing_date', 'edition'], name='unique_issue_per_date_edition')]
 
     def get_path(self) -> Path | None:
@@ -72,20 +79,16 @@ class IssueSection(models.Model):
         verbose_name='Page',
         help_text='The physical page number where this section starts in the issue.',
     )
-    page_indexes = models.TextField(
+    page_indexes = models.JSONField(
         verbose_name='Page Indexes',
         help_text='Comma-separated list of image indexes in the CBZ file.',
-        default='',
+        default=list,
         blank=True
     )
 
     @property
-    def page_indexes_list(self):
-        if not self.page_indexes:
-            return []
-
-        values = (i.strip() for i in self.page_indexes.split(','))
-        return [int(s) for s in values if s.isdigit()]
+    def page_indexes_list(self) -> list[int]:
+        return self.page_indexes or []
 
     class Meta:
         verbose_name = 'Issue Section'
@@ -111,7 +114,7 @@ class Credit(models.Model):
     class Meta:
         verbose_name = 'Credit'
         verbose_name_plural = 'Credits'
-        ordering = ['issue_section__issue__publishing_date', 'role', 'person']
+        ordering = ['issue_section__issue__publishing_date', 'issue_section__page', 'role', 'person__name']
 
     def __str__(self) -> str:
         role_text = f' as {self.role}' if self.role else ''

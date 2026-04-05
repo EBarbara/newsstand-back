@@ -6,19 +6,19 @@ from .models import Issue, IssueCover, IssueSection, Section, Person, Credit
 class PersonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Person
-        fields = ['name', ]
+        fields = ['id', 'name', ]
 
 
 class IssueCoverSerializer(serializers.ModelSerializer):
     class Meta:
         model = IssueCover
-        fields = ['id', 'image']
+        fields = ['id', 'image', ]
 
 
 class SectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Section
-        fields = '__all__'
+        fields = ['id', 'name', ]
 
 
 class CreditSerializer(serializers.ModelSerializer):
@@ -31,25 +31,22 @@ class CreditSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Credit
-        fields = ['id', 'person', 'person_id', 'role']
+        fields = ['id', 'person', 'person_id', 'role', ]
 
 
 class IssueSectionSerializer(serializers.ModelSerializer):
     section = SectionSerializer(read_only=True)
     section_id = serializers.PrimaryKeyRelatedField(
-        queryset=IssueSection.objects.all(),
+        queryset=Section.objects.all(),
         source='section',
         write_only=True
     )
     credits = CreditSerializer(many=True, read_only=True)
-    page_indexes = serializers.SerializerMethodField()
+    page_indexes = serializers.ListField(child=serializers.IntegerField())
 
     class Meta:
         model = IssueSection
-        fields = ['id', 'section', 'section_id', 'issue', 'page', 'page_indexes', 'credits']
-
-    def get_page_indexes(self, obj):
-        return obj.page_indexes_list
+        fields = ['id', 'section', 'section_id', 'issue', 'page', 'page_indexes', 'credits', ]
 
 
 class IssueDetailSerializer(serializers.ModelSerializer):
@@ -58,12 +55,17 @@ class IssueDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Issue
-        fields = ['id', 'publishing_date', 'edition', 'file_path', 'covers', 'sections']
+        fields = ['id', 'publishing_date', 'edition', 'file_path', 'covers', 'sections', ]
 
 
 class IssueListSerializer(serializers.ModelSerializer):
     covers = IssueCoverSerializer(many=True, read_only=True)
+    is_digital = serializers.SerializerMethodField()
 
     class Meta:
         model = Issue
-        fields = ['id', 'publishing_date', 'edition', 'file_path', 'covers']
+        fields = ['id', 'publishing_date', 'edition', 'is_digital', 'covers', ]
+
+    @staticmethod
+    def get_is_digital(obj):
+        return bool(obj.file_path)
