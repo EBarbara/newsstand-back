@@ -10,7 +10,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from .models import Issue, Magazine
-from .serializers import IssueDetailSerializer, IssueListSerializer
+from .serializers import IssueDetailSerializer, IssueListSerializer, PageSerializer
 from .services import get_issue_pages, get_page_image
 
 
@@ -96,17 +96,13 @@ class IssueViewSet(viewsets.ModelViewSet):
         return serializer.save()
 
     @extend_schema(
+        operation_id="issue_pages_list",
         summary="Listar páginas do CBZ",
         description="Retorna a lista de páginas disponíveis na edição",
-        responses={
-            200: OpenApiResponse(
-                response=OpenApiTypes.OBJECT,
-                description="Lista de páginas",
-            )
-        }
+        responses=PageSerializer(many=True),
     )
     @action(detail=True, methods=['get'])
-    def pages(self, request, pk=None):
+    def pages(self, request, magazine_slug=None, pk=None):
         issue = self.get_object()
 
         try:
@@ -121,6 +117,7 @@ class IssueViewSet(viewsets.ModelViewSet):
         return Response([{'index': i, 'name': name} for i, name in enumerate(files)])
 
     @extend_schema(
+        operation_id="issue_page_image",
         summary="Obter imagem da página",
         description="Retorna a imagem JPEG de uma página específica",
         parameters=[

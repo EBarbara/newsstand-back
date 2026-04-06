@@ -18,12 +18,10 @@ class IssueCoverSerializer(serializers.ModelSerializer):
         model = IssueCover
         fields = ['id', 'image', ]
 
-
 class SectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Section
         fields = ['id', 'name', ]
-
 
 class CreditSerializer(serializers.ModelSerializer):
     person = PersonSerializer(read_only=True)
@@ -36,7 +34,6 @@ class CreditSerializer(serializers.ModelSerializer):
     class Meta:
         model = Credit
         fields = ['id', 'person', 'person_id', 'role', ]
-
 
 class IssueSectionSerializer(serializers.ModelSerializer):
     section = SectionSerializer(read_only=True)
@@ -52,7 +49,6 @@ class IssueSectionSerializer(serializers.ModelSerializer):
         model = IssueSection
         fields = ['id', 'section', 'section_id', 'issue', 'page', 'page_indexes', 'credits', ]
 
-
 class IssueDetailSerializer(serializers.ModelSerializer):
     covers = IssueCoverSerializer(many=True, read_only=True)
     magazine = MagazineSerializer(read_only=True)
@@ -66,7 +62,6 @@ class IssueDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Issue
         fields = ['id', 'publishing_date', 'edition', 'file_path', 'magazine', 'magazine_id', 'covers', 'sections', ]
-
 
 class IssueListSerializer(serializers.ModelSerializer):
     covers = IssueCoverSerializer(many=True, read_only=True)
@@ -82,6 +77,9 @@ class IssueListSerializer(serializers.ModelSerializer):
         model = Issue
         fields = ['id', 'publishing_date', 'edition', 'is_digital', 'magazine', 'magazine_id', 'covers', ]
 
-    @staticmethod
-    def get_is_digital(obj):
+    def get_is_digital(self, obj) -> bool:
         return bool(obj.file_path)
+
+class PageSerializer(serializers.Serializer):
+    index = serializers.IntegerField()
+    name = serializers.CharField()
