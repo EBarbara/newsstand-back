@@ -102,7 +102,7 @@ class IssueViewSet(viewsets.ModelViewSet):
         responses=PageSerializer(many=True),
     )
     @action(detail=True, methods=['get'])
-    def pages(self, request, magazine_slug=None, pk=None):
+    def pages(self, request, *args, **kwargs):
         issue = self.get_object()
 
         try:
@@ -136,11 +136,11 @@ class IssueViewSet(viewsets.ModelViewSet):
         }
     )
     @action(detail=True, methods=['get'], url_path='pages/(?P<index>[^/.]+)')
-    def page_image(self, request, pk=None, index=None):
+    def page_image(self, request, *args, **kwargs):
         issue = self.get_object()
 
         try:
-            index = int(index)
+            index = int(kwargs['index'])
         except ValueError:
             return HttpResponse(status=400)
 
