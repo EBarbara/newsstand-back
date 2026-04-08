@@ -49,36 +49,30 @@ class IssueSectionSerializer(serializers.ModelSerializer):
         model = IssueSection
         fields = ['id', 'section', 'section_id', 'issue', 'page', 'page_indexes', 'credits', ]
 
-class IssueDetailSerializer(serializers.ModelSerializer):
+class IssueBaseSerializer(serializers.ModelSerializer):
     covers = IssueCoverSerializer(many=True, read_only=True)
     magazine = MagazineSerializer(read_only=True)
+    is_digital = serializers.SerializerMethodField()
     magazine_id = serializers.PrimaryKeyRelatedField(
         queryset=Magazine.objects.all(),
         source='magazine',
         write_only=True
     )
+
+    def get_is_digital(self, obj):
+        return bool(obj.file_path)
+
+class IssueDetailSerializer(IssueBaseSerializer):
     sections = IssueSectionSerializer(many=True, read_only=True)
 
     class Meta:
         model = Issue
-        fields = ['id', 'publishing_date', 'edition', 'file_path', 'magazine', 'magazine_id', 'covers', 'sections', ]
+        fields = ['id', 'publishing_date', 'edition', 'is_digital', 'file_path', 'magazine', 'magazine_id', 'covers', 'sections', ]
 
-class IssueListSerializer(serializers.ModelSerializer):
-    covers = IssueCoverSerializer(many=True, read_only=True)
-    magazine = MagazineSerializer(read_only=True)
-    magazine_id = serializers.PrimaryKeyRelatedField(
-        queryset=Magazine.objects.all(),
-        source='magazine',
-        write_only=True
-    )
-    is_digital = serializers.SerializerMethodField()
-
+class IssueListSerializer(IssueBaseSerializer):
     class Meta:
         model = Issue
         fields = ['id', 'publishing_date', 'edition', 'is_digital', 'magazine', 'magazine_id', 'covers', ]
-
-    def get_is_digital(self, obj) -> bool:
-        return bool(obj.file_path)
 
 class PageSerializer(serializers.Serializer):
     index = serializers.IntegerField()

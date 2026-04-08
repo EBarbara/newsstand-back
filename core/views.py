@@ -10,7 +10,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from .models import Issue, Magazine
-from .serializers import IssueDetailSerializer, IssueListSerializer, PageSerializer
+from .serializers import IssueDetailSerializer, IssueListSerializer, PageSerializer, MagazineSerializer
 from .services import get_issue_pages, get_page_image
 
 
@@ -161,7 +161,6 @@ class IssueViewSet(viewsets.ModelViewSet):
 
         return response
 
-
 class PublicIssueViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Issue.objects.all()
     serializer_class = IssueListSerializer
@@ -171,7 +170,11 @@ class PublicIssueViewSet(viewsets.ReadOnlyModelViewSet):
         description="Retorna as edições mais recentes",
         responses=IssueListSerializer(many=True)
     )
-    def list(self, request):
-        qs = Issue.objects.order_by('-created_at')[:10]
+    def list(self, request, *args, **kwargs):
+        qs = Issue.objects.order_by('-publishing_date')[:10]
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
+
+class PublicMagazineViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Magazine.objects.all()
+    serializer_class = MagazineSerializer

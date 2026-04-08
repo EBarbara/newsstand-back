@@ -47,7 +47,7 @@ class Issue(models.Model):
 
     magazine = models.ForeignKey(Magazine, on_delete=models.CASCADE, related_name='issues')
     publishing_date = models.DateField(verbose_name='Publishing Date')
-    edition = models.IntegerField(null=True, blank=True, verbose_name='Edition')
+    edition = models.CharField(max_length=255, null=True, blank=True, verbose_name='Edition')
     file_path = models.CharField(
         max_length=1000,
         null=True,
