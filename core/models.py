@@ -103,7 +103,7 @@ class IssueSection(models.Model):
 
     @property
     def page_indexes_list(self) -> list[int]:
-        return self.page_indexes or []
+        return sorted(self.page_indexes or [])
 
     class Meta:
         verbose_name = 'Issue Section'

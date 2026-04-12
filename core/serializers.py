@@ -44,10 +44,15 @@ class IssueSectionSerializer(serializers.ModelSerializer):
     )
     credits = CreditSerializer(many=True, read_only=True)
     page_indexes = serializers.ListField(child=serializers.IntegerField())
+    first_page_index = serializers.SerializerMethodField()
 
     class Meta:
         model = IssueSection
-        fields = ['id', 'section', 'section_id', 'issue', 'page', 'page_indexes', 'credits', ]
+        fields = ['id', 'section', 'section_id', 'issue', 'page', 'page_indexes', 'credits', 'first_page_index', ]
+
+    def get_first_page_index(self, obj):
+        indexes = obj.page_indexes_list
+        return min(indexes) if indexes else None
 
 class IssueBaseSerializer(serializers.ModelSerializer):
     covers = IssueCoverSerializer(many=True, read_only=True)

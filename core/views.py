@@ -9,7 +9,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import Issue, Magazine
+from .models import Issue, Magazine, IssueSection
 from .serializers import IssueDetailSerializer, IssueListSerializer, PageSerializer, MagazineSerializer
 from .services import get_issue_pages, get_page_image
 
@@ -55,17 +55,22 @@ class IssueViewSet(viewsets.ModelViewSet):
 
         return qs
 
-    queryset = get_queryset
-
     def get_object(self):
-        obj = cast(Issue, super().get_object())
+        queryset = self.get_queryset()
 
         magazine_slug = self.kwargs.get('magazine_slug')
+        lookup_value = self.kwargs.get(self.lookup_field or 'pk')
 
-        if magazine_slug and obj.magazine.slug != magazine_slug:
-            raise Http404()
+        if magazine_slug:
+            try:
+                return queryset.get(
+                    magazine__slug = magazine_slug,
+                    edition__iexact = lookup_value
+                )
+            except Issue.DoesNotExist:
+                raise Http404("Issue not found")
 
-        return obj
+        return cast(Issue, super().get_object())
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -160,6 +165,31 @@ class IssueViewSet(viewsets.ModelViewSet):
         response['ETag'] = hashlib.md5(data).hexdigest()
 
         return response
+
+    @extend_schema(
+        operation_id="issue_section_pages",
+        summary="Listar páginas de uma seção",
+        description="Retorna apenas as páginas pertencentes a uma seção específica",
+        responses=PageSerializer(many=True),
+    )
+    @action(detail=True, methods=['get'], url_path='sections/(?P<section_id>[^/.]+)/pages')
+    def section_pages(self, request, *args, **kwargs):
+        issue = self.get_object()
+        section_id = kwargs.get('section_id')
+
+        try:
+            issue_section = IssueSection.objects.get(issue=issue, id=section_id)
+        except IssueSection.DoesNotExist:
+            return Response({'error': 'Section not found'}, status=404)
+
+        try:
+            files = get_issue_pages(issue)
+        except Exception:
+            return Response({'error': 'Error reading CBZ'}, status=500)
+
+        indexes = issue_section.page_indexes_list
+
+        return Response([{'index': i, 'name': files[i]} for i in indexes if i < len(files)])
 
 class PublicIssueViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Issue.objects.all()

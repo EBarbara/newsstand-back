@@ -19,8 +19,14 @@ router.register(
     basename='magazine-issues'
 )
 
+router.register(
+    r'issues',
+    IssueViewSet,
+    basename='issues'
+)
+
 urlpatterns = [
-    path('api/<str:version>/', include(router.urls)),
     path('api/<str:version>/issues/recent/', PublicIssueViewSet.as_view({'get': 'list'})),
     path('api/<str:version>/magazines/', PublicMagazineViewSet.as_view({'get': 'list'})),
+    path('api/<str:version>/', include(router.urls)),
 ]
