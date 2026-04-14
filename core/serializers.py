@@ -48,7 +48,17 @@ class IssueSectionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = IssueSection
-        fields = ['id', 'section', 'section_id', 'issue', 'page', 'page_indexes', 'credits', 'first_page_index', ]
+        fields = [
+            'id',
+            'section',
+            'section_id',
+            'issue',
+            'page',
+            'page_indexes',
+            'credits',
+            'first_page_index',
+            'text_content',
+        ]
 
     def get_first_page_index(self, obj):
         indexes = obj.page_indexes_list

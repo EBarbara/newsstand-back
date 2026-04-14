@@ -100,6 +100,11 @@ class IssueSection(models.Model):
         default=list,
         blank=True
     )
+    text_content = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Optional textual content of the section."
+    )
 
     @property
     def page_indexes_list(self) -> list[int]:
