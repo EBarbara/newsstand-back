@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Issue, IssueCover, IssueSection, Section, Person, Credit, Magazine, RenderAsset, SectionSegment
+from .models import Issue, IssueSection, Section, Person, Credit, Magazine, RenderAsset, SectionSegment
 
 
 class RenderSerializer(serializers.ModelSerializer):
@@ -45,11 +45,6 @@ class IssueReaderSerializer(serializers.ModelSerializer):
             'sections',
         ]
 
-class IssueListSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Issue
-        fields = ['id', 'publishing_date', 'edition']
-
 class PersonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Person
@@ -60,10 +55,17 @@ class MagazineSerializer(serializers.ModelSerializer):
         model = Magazine
         fields = ['name', 'slug']
 
-class IssueCoverSerializer(serializers.ModelSerializer):
+class IssueListSerializer(serializers.ModelSerializer):
+    magazine = MagazineSerializer(read_only=True)
+    cover = serializers.SerializerMethodField()
+
+    def get_cover(self, obj):
+        first = obj.renders.order_by('order').first()
+        return first.image.url if first else None
+
     class Meta:
-        model = IssueCover
-        fields = ['id', 'image', ]
+        model = Issue
+        fields = ['id', 'publishing_date', 'edition', 'magazine', 'cover']
 
 class CreditSerializer(serializers.ModelSerializer):
     person = PersonSerializer(read_only=True)

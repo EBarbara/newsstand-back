@@ -76,18 +76,6 @@ class Section(models.Model):
         return self.name
 
 
-class IssueCover(models.Model):
-    issue = models.ForeignKey(Issue, on_delete=models.CASCADE, related_name='covers', verbose_name='Issue')
-    image = models.ImageField(upload_to='covers/', verbose_name='Image')
-
-    class Meta:
-        verbose_name = 'Issue Cover'
-        verbose_name_plural = 'Issue Covers'
-
-    def __str__(self) -> str:
-        return f'Cover for {self.issue}'
-
-
 class IssueSection(models.Model):
     issue = models.ForeignKey(Issue, on_delete=models.CASCADE, verbose_name='Issue', related_name='issue_sections')
     section = models.ForeignKey(Section, on_delete=models.CASCADE, verbose_name='Section')
