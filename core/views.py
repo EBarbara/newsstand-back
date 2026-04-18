@@ -1,57 +1,28 @@
-import hashlib
-import zipfile
-from typing import cast
-
-from django.http import HttpResponse, Http404
-from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema_view, extend_schema, OpenApiResponse, OpenApiParameter
+from django.http import Http404
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from .models import Issue, Magazine, IssueSection
-from .serializers import IssueDetailSerializer, IssueListSerializer, PageSerializer, MagazineSerializer
-from .services import get_issue_pages, get_page_image
+from .serializers import IssueListSerializer, MagazineSerializer, IssueReaderSerializer
 
 
-@extend_schema_view(
-    list=extend_schema(
-        summary='Listar edições da revista',
-        description="Retorna todas as edições de uma revista específica",
-    ),
-    retrieve=extend_schema(
-        summary="Detalhar issue",
-        description="Retorna detalhes completos da edição",
-    ),
-    create=extend_schema(
-        summary="Criar issue",
-    ),
-    update=extend_schema(
-        summary="Atualizar issue",
-    ),
-    partial_update=extend_schema(
-        summary="Atualizar parcialmente issue",
-    ),
-    destroy=extend_schema(
-        summary="Remover issue",
-    ),
-)
-class IssueViewSet(viewsets.ModelViewSet):
+class IssueViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Issue.objects.all()
+
     def get_queryset(self):
-        qs = Issue.objects.all()
+        qs = super().get_queryset()
 
-        magazine = self.kwargs.get('magazine_slug')
-        if magazine:
-            qs = qs.for_magazine_slug(magazine)
-
-        if self.action == 'list':
-            return qs.for_list()
+        magazine_slug = self.kwargs.get('magazine_slug')
+        if magazine_slug:
+            qs = qs.filter(magazine__slug=magazine_slug)
 
         if self.action == 'retrieve':
-            return qs.for_detail()
-
-        if self.action in ['pages', 'page_image']:
-            return qs.for_reader()
+            qs = qs.prefetch_related(
+                'renders',
+                'issue_sections__section',
+                'issue_sections__segments',
+            )
 
         return qs
 
@@ -61,150 +32,49 @@ class IssueViewSet(viewsets.ModelViewSet):
         magazine_slug = self.kwargs.get('magazine_slug')
         lookup_value = self.kwargs.get(self.lookup_field or 'pk')
 
+        # lookup por edição quando estiver dentro de magazine
         if magazine_slug:
             try:
                 return queryset.get(
-                    magazine__slug = magazine_slug,
-                    edition__iexact = lookup_value
+                    magazine__slug=magazine_slug,
+                    edition__iexact=lookup_value
                 )
             except Issue.DoesNotExist:
                 raise Http404("Issue not found")
 
-        return cast(Issue, super().get_object())
+        return super().get_object()
 
     def get_serializer_class(self):
         if self.action == 'list':
             return IssueListSerializer
-        return IssueDetailSerializer
+        return IssueReaderSerializer
 
-    def perform_create(self, serializer):
-        magazine_slug = self.kwargs.get('magazine_slug')
-        if not magazine_slug:
-            raise Http404("Magazine slug is required")
-
-        try:
-            magazine = Magazine.objects.get(slug=magazine_slug)
-        except Magazine.DoesNotExist:
-            raise Http404("Magazine not found")
-
-        return serializer.save(magazine=magazine)
-
-    def perform_update(self, serializer):
-        magazine_slug = self.kwargs.get('magazine_slug')
-
-        if not magazine_slug:
-            return serializer.save()
-
-        if serializer.instance.magazine.slug != magazine_slug:
-            raise Http404("Magazine mismatch")
-
-        return serializer.save()
-
-    @extend_schema(
-        operation_id="issue_pages_list",
-        summary="Listar páginas do CBZ",
-        description="Retorna a lista de páginas disponíveis na edição",
-        responses=PageSerializer(many=True),
-    )
-    @action(detail=True, methods=['get'])
-    def pages(self, request, *args, **kwargs):
+    @action(detail=True, methods=['get'], url_path='pages/(?P<page>[^/.]+)')
+    def page_detail(self, request, *args, **kwargs):
         issue = self.get_object()
-
         try:
-            files = get_issue_pages(issue)
-        except FileNotFoundError:
-            return Response({'error': 'File not found'}, status=404)
-        except PermissionError:
-            return Response({'error': 'Invalid path'}, status=403)
-        except zipfile.BadZipFile:
-            return Response({'error': 'Invalid CBZ file'}, status=500)
-
-        return Response([{'index': i, 'name': name} for i, name in enumerate(files)])
-
-    @extend_schema(
-        operation_id="issue_page_image",
-        summary="Obter imagem da página",
-        description="Retorna a imagem JPEG de uma página específica",
-        parameters=[
-            OpenApiParameter(
-                name='index',
-                type=OpenApiTypes.INT,
-                location='path',
-                description='Índice da página'
-            )
-        ],
-        responses={
-            200: OpenApiResponse(
-                response=OpenApiTypes.BINARY,
-                description="Imagem JPEG"
-            )
-        }
-    )
-    @action(detail=True, methods=['get'], url_path='pages/(?P<index>[^/.]+)')
-    def page_image(self, request, *args, **kwargs):
-        issue = self.get_object()
-
-        try:
-            index = int(kwargs['index'])
+            page = int(kwargs['page'])
         except ValueError:
-            return HttpResponse(status=400)
+            return Response({"error": "Invalid page"}, status=400)
 
-        try:
-            data = get_page_image(issue, index)
-        except FileNotFoundError:
-            return HttpResponse(status=404)
-        except PermissionError:
-            return HttpResponse(status=403)
-        except IndexError:
-            return HttpResponse(status=404)
-        except ValueError:
-            return HttpResponse(status=500)
+        render = issue.pages.filter(order=page).first()
 
-        response = HttpResponse(data, content_type='image/jpeg')
-        response['Cache-Control'] = 'public, max-age=86400'  # 1 dia
-        response['ETag'] = hashlib.md5(data).hexdigest()
+        issue_section = IssueSection.objects.filter(
+            issue=issue,
+            segments__start_page__lte=page,
+            segments__end_page__gte=page
+        ).distinct().first()
 
-        return response
+        return Response({
+            "page": page,
+            "image": render.image.url if render else None,
+            "section": {
+                "id": issue_section.id,
+                "name": issue_section.section.name,
+                "has_text": bool(issue_section.text_content)
+            } if issue_section else None
+        })
 
-    @extend_schema(
-        operation_id="issue_section_pages",
-        summary="Listar páginas de uma seção",
-        description="Retorna apenas as páginas pertencentes a uma seção específica",
-        responses=PageSerializer(many=True),
-    )
-    @action(detail=True, methods=['get'], url_path='sections/(?P<section_id>[^/.]+)/pages')
-    def section_pages(self, request, *args, **kwargs):
-        issue = self.get_object()
-        section_id = kwargs.get('section_id')
-
-        try:
-            issue_section = IssueSection.objects.get(issue=issue, id=section_id)
-        except IssueSection.DoesNotExist:
-            return Response({'error': 'Section not found'}, status=404)
-
-        try:
-            files = get_issue_pages(issue)
-        except Exception:
-            return Response({'error': 'Error reading CBZ'}, status=500)
-
-        indexes = issue_section.page_indexes_list
-
-        return Response([{'index': i, 'name': files[i]} for i in indexes if i < len(files)])
-
-class PublicIssueViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Issue.objects.all()
-    serializer_class = IssueListSerializer
-
-    @extend_schema(
-        summary="Issues recentes",
-        description="Retorna as edições mais recentes",
-        responses=IssueListSerializer(many=True)
-    )
-    def list(self, request, *args, **kwargs):
-        qs = Issue.objects.order_by('-publishing_date')[:10]
-        serializer = self.get_serializer(qs, many=True)
-        return Response(serializer.data)
-
-class PublicMagazineViewSet(viewsets.ReadOnlyModelViewSet):
+class MagazineViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Magazine.objects.all()
     serializer_class = MagazineSerializer

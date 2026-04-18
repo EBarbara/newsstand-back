@@ -1,16 +1,7 @@
 from django.urls import path, include
-from rest_framework import routers
 from rest_framework.routers import SimpleRouter
 
-from .views import IssueViewSet, PublicIssueViewSet, PublicMagazineViewSet
-
-issue_list = IssueViewSet.as_view({'get': 'list'})
-issue_detail = IssueViewSet.as_view({
-    'get': 'retrieve',
-    'put': 'update',
-    'patch': 'partial_update',
-    'delete': 'destroy',
-})
+from .views import IssueViewSet, MagazineViewSet
 
 router = SimpleRouter()
 router.register(
@@ -25,8 +16,14 @@ router.register(
     basename='issues'
 )
 
+router.register(
+    r'magazines',
+    MagazineViewSet,
+    basename='magazines'
+)
+
 urlpatterns = [
-    path('api/<str:version>/issues/recent/', PublicIssueViewSet.as_view({'get': 'list'})),
-    path('api/<str:version>/magazines/', PublicMagazineViewSet.as_view({'get': 'list'})),
+    path('api/<str:version>/issues/recent/', IssueViewSet.as_view({'get': 'list'})),
+    path('api/<str:version>/magazines/', MagazineViewSet.as_view({'get': 'list'})),
     path('api/<str:version>/', include(router.urls)),
 ]
