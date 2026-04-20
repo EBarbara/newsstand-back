@@ -53,7 +53,29 @@ class IssueSectionSerializer(serializers.ModelSerializer):
             'section',
             'segments',
             'text_content',
+            'order',
         ]
+
+class IssueSectionWriteSerializer(serializers.ModelSerializer):
+    section_id = serializers.PrimaryKeyRelatedField(
+        queryset=Section.objects.all(),
+        source='section',
+    )
+
+    segments = SectionSegmentSerializer(many=True)
+
+    class Meta:
+        model = IssueSection
+        fields = ['id', 'section_id', 'text_content', 'order', 'segments']
+
+    def create(self, validated_data: dict) -> IssueSection:
+        segments_data = validated_data.pop('segments', [])
+        issue_section = IssueSection.objects.create(**validated_data)
+
+        for seg in segments_data:
+            SectionSegment.objects.create(issue_section=issue_section, **seg)
+
+        return issue_section
 
 class PersonSerializer(serializers.ModelSerializer):
     class Meta:

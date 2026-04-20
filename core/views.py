@@ -4,7 +4,13 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from .models import Issue, Magazine, IssueSection
-from .serializers import IssueListSerializer, MagazineSerializer, IssueReaderSerializer
+from .serializers import (
+    IssueListSerializer,
+    IssueReaderSerializer,
+    IssueSectionWriteSerializer,
+    IssueSectionSerializer,
+    MagazineSerializer,
+)
 
 
 class IssueViewSet(viewsets.ReadOnlyModelViewSet):
@@ -30,11 +36,16 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = self.get_queryset()
 
         magazine_slug = self.kwargs.get('magazine_slug')
-        lookup_value = self.kwargs.get(self.lookup_field or 'pk')
+        lookup_field = 'pk'
 
         # lookup por edição quando estiver dentro de magazine
         if magazine_slug:
             try:
+                lookup_value = self.kwargs.get('pk')
+
+                if not lookup_value:
+                    raise Http404("Edition not provided")
+
                 return queryset.get(
                     magazine__slug=magazine_slug,
                     edition__iexact=lookup_value
@@ -59,11 +70,21 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
 
         render = issue.renders.filter(order=page).first()
 
-        issue_section = IssueSection.objects.filter(
+        sections = IssueSection.objects.filter(
             issue=issue,
             segments__start_page__lte=page,
             segments__end_page__gte=page
-        ).distinct().first()
+        ).distinct()
+
+        sections = list(sections[:2])
+
+        if len(sections) > 1:
+            return Response(
+                {"error": "Multiple sections found for page. Data inconsistency."},
+                status=500
+            )
+
+        issue_section = sections[0] if sections else None
 
         return Response({
             "page": page,
@@ -78,3 +99,20 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
 class MagazineViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Magazine.objects.all()
     serializer_class = MagazineSerializer
+    lookup_field = 'slug'
+    lookup_url_kwarg = 'magazine_slug'
+
+class IssueSectionViewSet(viewsets.ModelViewSet):
+
+    def get_queryset(self):
+        return IssueSection.objects.filter(
+            issue_id=self.kwargs['issue_pk']
+        ).select_related('section').prefetch_related('segments')
+
+    def get_serializer_class(self):
+        if self.action in ['list', 'retrieve']:
+            return IssueSectionSerializer
+        return IssueSectionWriteSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(issue_id=self.kwargs['issue_pk'])

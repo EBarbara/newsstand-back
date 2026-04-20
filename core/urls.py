@@ -1,29 +1,22 @@
 from django.urls import path, include
-from rest_framework.routers import SimpleRouter
+from rest_framework.routers import DefaultRouter
+from rest_framework_nested.routers import NestedDefaultRouter
 
-from .views import IssueViewSet, MagazineViewSet
+from .views import IssueViewSet, MagazineViewSet, IssueSectionViewSet
 
-router = SimpleRouter()
-router.register(
-    r'magazines/(?P<magazine_slug>[-\w]+)/issues',
-    IssueViewSet,
-    basename='magazine-issues'
-)
+router = DefaultRouter()
+router.register(r'magazines', MagazineViewSet, basename='magazines')
+router.register(r'issues', IssueViewSet, basename='issues')
 
-router.register(
-    r'issues',
-    IssueViewSet,
-    basename='issues'
-)
+magazines_router = NestedDefaultRouter(router, r'magazines', lookup='magazine')
+magazines_router.register(r'issues', IssueViewSet, basename='magazine-issues')
 
-router.register(
-    r'magazines',
-    MagazineViewSet,
-    basename='magazines'
-)
+issues_router = NestedDefaultRouter(router, r'issues', lookup='issue')
+issues_router.register(r'sections', IssueSectionViewSet, basename='issue-sections')
 
 urlpatterns = [
     path('api/<str:version>/issues/recent/', IssueViewSet.as_view({'get': 'list'})),
-    path('api/<str:version>/magazines/', MagazineViewSet.as_view({'get': 'list'})),
     path('api/<str:version>/', include(router.urls)),
+    path('api/<str:version>/', include(magazines_router.urls)),
+    path('api/<str:version>/', include(issues_router.urls)),
 ]

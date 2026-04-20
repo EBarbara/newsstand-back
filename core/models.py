@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -79,6 +80,7 @@ class Section(models.Model):
 class IssueSection(models.Model):
     issue = models.ForeignKey(Issue, on_delete=models.CASCADE, verbose_name='Issue', related_name='issue_sections')
     section = models.ForeignKey(Section, on_delete=models.CASCADE, verbose_name='Section')
+    order = models.IntegerField()
     text_content = models.TextField(
         null=True,
         blank=True,
@@ -91,6 +93,16 @@ class SectionSegment(models.Model):
 
     start_page = models.IntegerField()
     end_page = models.IntegerField()
+
+    def clean(self):
+        overlapping = SectionSegment.objects.filter(
+            issue_section__issue=self.issue_section.issue,
+            start_page__lte=self.start_page,
+            end_page__gte=self.end_page
+        ).exclude(issue_section=self.issue_section)
+
+        if overlapping.exists():
+            raise ValidationError("Page range overlaps with another section.")
 
 
 class Person(models.Model):
