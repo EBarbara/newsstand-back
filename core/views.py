@@ -57,7 +57,7 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
         except ValueError:
             return Response({"error": "Invalid page"}, status=400)
 
-        render = issue.pages.filter(order=page).first()
+        render = issue.renders.filter(order=page).first()
 
         issue_section = IssueSection.objects.filter(
             issue=issue,

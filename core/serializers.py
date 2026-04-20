@@ -1,7 +1,31 @@
+from typing import TYPE_CHECKING, Optional
+
 from rest_framework import serializers
+from rest_framework.request import Request
 
 from .models import Issue, IssueSection, Section, Person, Credit, Magazine, RenderAsset, SectionSegment
 
+if TYPE_CHECKING:
+    from rest_framework.serializers import Serializer
+
+class IssueCoverMixin:
+    context: dict
+
+    def get_cover(self, obj):
+        request: Request | None = self.context.get("request")
+
+        renders = list(obj.renders.all())
+        first: Optional[RenderAsset] = renders[0] if renders else None
+
+        if first is None:
+            return None
+
+        url = first.image.url
+
+        if request is not None:
+            return request.build_absolute_uri(url)
+
+        return url
 
 class RenderSerializer(serializers.ModelSerializer):
     class Meta:
@@ -31,20 +55,6 @@ class IssueSectionSerializer(serializers.ModelSerializer):
             'text_content',
         ]
 
-class IssueReaderSerializer(serializers.ModelSerializer):
-    renders = RenderSerializer(many=True, read_only=True)
-    sections = IssueSectionSerializer(source='issue_sections', many=True, read_only=True)
-
-    class Meta:
-        model = Issue
-        fields = [
-            'id',
-            'publishing_date',
-            'edition',
-            'renders',
-            'sections',
-        ]
-
 class PersonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Person
@@ -55,17 +65,31 @@ class MagazineSerializer(serializers.ModelSerializer):
         model = Magazine
         fields = ['name', 'slug']
 
-class IssueListSerializer(serializers.ModelSerializer):
+class IssueListSerializer(IssueCoverMixin, serializers.ModelSerializer):
     magazine = MagazineSerializer(read_only=True)
     cover = serializers.SerializerMethodField()
-
-    def get_cover(self, obj):
-        first = obj.renders.order_by('order').first()
-        return first.image.url if first else None
 
     class Meta:
         model = Issue
         fields = ['id', 'publishing_date', 'edition', 'magazine', 'cover']
+
+class IssueReaderSerializer(IssueCoverMixin, serializers.ModelSerializer):
+    magazine = MagazineSerializer(read_only=True)
+    renders = RenderSerializer(many=True, read_only=True)
+    sections = IssueSectionSerializer(source='issue_sections', many=True, read_only=True)
+    cover = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Issue
+        fields = [
+            'id',
+            'publishing_date',
+            'edition',
+            'magazine',
+            'cover',
+            'renders',
+            'sections',
+        ]
 
 class CreditSerializer(serializers.ModelSerializer):
     person = PersonSerializer(read_only=True)
