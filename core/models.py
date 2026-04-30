@@ -80,6 +80,7 @@ class Section(models.Model):
 class IssueSection(models.Model):
     issue = models.ForeignKey(Issue, on_delete=models.CASCADE, verbose_name='Issue', related_name='issue_sections')
     section = models.ForeignKey(Section, on_delete=models.CASCADE, verbose_name='Section')
+    title = models.CharField(max_length=255, null=True, blank=True)
     order = models.IntegerField()
     text_content = models.TextField(
         null=True,

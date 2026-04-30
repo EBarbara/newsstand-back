@@ -2,11 +2,12 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_nested.routers import NestedDefaultRouter
 
-from .views import IssueViewSet, MagazineViewSet, IssueSectionViewSet
+from .views import IssueViewSet, MagazineViewSet, IssueSectionViewSet, SectionViewSet
 
 router = DefaultRouter()
 router.register(r'magazines', MagazineViewSet, basename='magazines')
 router.register(r'issues', IssueViewSet, basename='issues')
+router.register(r'sections', SectionViewSet, basename='sections')
 
 magazines_router = NestedDefaultRouter(router, r'magazines', lookup='magazine')
 magazines_router.register(r'issues', IssueViewSet, basename='magazine-issues')

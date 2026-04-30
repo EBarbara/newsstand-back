@@ -3,13 +3,14 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import Issue, Magazine, IssueSection
+from .models import Issue, Magazine, IssueSection, Section
 from .serializers import (
     IssueListSerializer,
     IssueReaderSerializer,
     IssueSectionWriteSerializer,
     IssueSectionSerializer,
     MagazineSerializer,
+    SectionSerializer,
 )
 
 
@@ -101,6 +102,10 @@ class MagazineViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = MagazineSerializer
     lookup_field = 'slug'
     lookup_url_kwarg = 'magazine_slug'
+
+class SectionViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Section.objects.all()
+    serializer_class = SectionSerializer
 
 class IssueSectionViewSet(viewsets.ModelViewSet):
 

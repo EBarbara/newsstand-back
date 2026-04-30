@@ -1,12 +1,9 @@
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 from rest_framework import serializers
 from rest_framework.request import Request
 
 from .models import Issue, IssueSection, Section, Person, Credit, Magazine, RenderAsset, SectionSegment
-
-if TYPE_CHECKING:
-    from rest_framework.serializers import Serializer
 
 class IssueCoverMixin:
     context: dict
@@ -51,8 +48,9 @@ class IssueSectionSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'section',
-            'segments',
+            'title',
             'text_content',
+            'segments',
             'order',
         ]
 
@@ -66,7 +64,15 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = IssueSection
-        fields = ['id', 'section_id', 'text_content', 'order', 'segments']
+        fields = ['id', 'section_id', 'title', 'text_content', 'order', 'segments']
+
+    def validate_segments(self, value):
+        for seg in value:
+            if seg['start_page'] > seg['end_page']:
+                raise serializers.ValidationError(
+                    "start_page cannot be greater than end_page"
+                )
+        return value
 
     def create(self, validated_data: dict) -> IssueSection:
         segments_data = validated_data.pop('segments', [])
@@ -76,6 +82,21 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
             SectionSegment.objects.create(issue_section=issue_section, **seg)
 
         return issue_section
+
+    def update(self, instance: IssueSection, validated_data: dict) -> IssueSection:
+        segments_data = validated_data.pop('segments', [])
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if segments_data is not None:
+            instance.segments.all().delete()
+
+            for seg in segments_data:
+                SectionSegment.objects.create(issue_section=instance, **seg)
+
+        return instance
 
 class PersonSerializer(serializers.ModelSerializer):
     class Meta:
