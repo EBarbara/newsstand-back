@@ -1,21 +1,11 @@
-import configparser
-import os
-from django.conf import settings
 from django.http import Http404
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from decouple import config
 
 def get_recent_count():
-    config = configparser.ConfigParser()
-    ini_path = os.path.join(settings.BASE_DIR, 'settings.ini')
-    if os.path.exists(ini_path):
-        config.read(ini_path)
-        try:
-            return int(config.get('issues', 'recent_count', fallback=10))
-        except ValueError:
-            return 10
-    return 10
+    return config('ISSUES_RECENT_COUNT', default=10, cast=int)
 
 from .models import Issue, Magazine, IssueSection, Section
 from .serializers import (
