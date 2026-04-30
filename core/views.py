@@ -3,6 +3,10 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from decouple import config
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework import status
+
+from core.services import process_cbz_file
 
 def get_recent_count():
     return config('ISSUES_RECENT_COUNT', default=10, cast=int)
@@ -84,6 +88,32 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
+    def import_cbz(self, request, *args, **kwargs):
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({"error": "No file provided. Field must be named 'file'."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        magazine_slug = request.data.get('magazine')
+        edition = request.data.get('edition')
+        publishing_date = request.data.get('date')
+
+        try:
+            issue = process_cbz_file(
+                file_obj=file_obj,
+                filename=file_obj.name,
+                magazine_slug=magazine_slug,
+                edition=edition,
+                publishing_date=publishing_date
+            )
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": f"Failed to process CBZ: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        serializer = self.get_serializer(issue)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['get'], url_path='pages/(?P<page>[^/.]+)')
     def page_detail(self, request, *args, **kwargs):
