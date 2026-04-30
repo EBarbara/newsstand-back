@@ -16,7 +16,7 @@ issues_router = NestedDefaultRouter(router, r'issues', lookup='issue')
 issues_router.register(r'sections', IssueSectionViewSet, basename='issue-sections')
 
 urlpatterns = [
-    path('api/<str:version>/issues/recent/', IssueViewSet.as_view({'get': 'list'})),
+    path('api/<str:version>/issues/recent/', IssueViewSet.as_view({'get': 'recent'})),
     path('api/<str:version>/', include(router.urls)),
     path('api/<str:version>/', include(magazines_router.urls)),
     path('api/<str:version>/', include(issues_router.urls)),

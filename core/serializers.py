@@ -1,5 +1,7 @@
 from typing import Optional
 
+from django.db import transaction
+
 from rest_framework import serializers
 from rest_framework.request import Request
 
@@ -11,8 +13,7 @@ class IssueCoverMixin:
     def get_cover(self, obj):
         request: Request | None = self.context.get("request")
 
-        renders = list(obj.renders.all())
-        first: Optional[RenderAsset] = renders[0] if renders else None
+        first: Optional[RenderAsset] = obj.renders.first()
 
         if first is None:
             return None
@@ -74,6 +75,7 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
                 )
         return value
 
+    @transaction.atomic
     def create(self, validated_data: dict) -> IssueSection:
         segments_data = validated_data.pop('segments', [])
         issue_section = IssueSection.objects.create(**validated_data)
@@ -83,6 +85,7 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
 
         return issue_section
 
+    @transaction.atomic
     def update(self, instance: IssueSection, validated_data: dict) -> IssueSection:
         segments_data = validated_data.pop('segments', [])
 

@@ -1,7 +1,21 @@
+import configparser
+import os
+from django.conf import settings
 from django.http import Http404
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+
+def get_recent_count():
+    config = configparser.ConfigParser()
+    ini_path = os.path.join(settings.BASE_DIR, 'settings.ini')
+    if os.path.exists(ini_path):
+        config.read(ini_path)
+        try:
+            return int(config.get('issues', 'recent_count', fallback=10))
+        except ValueError:
+            return 10
+    return 10
 
 from .models import Issue, Magazine, IssueSection, Section
 from .serializers import (
@@ -20,13 +34,16 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
 
+        qs = qs.select_related('magazine')
+        if self.action in ['list', 'recent']:
+            qs = qs.prefetch_related('renders')
+
         magazine_slug = self.kwargs.get('magazine_slug')
         if magazine_slug:
             qs = qs.filter(magazine__slug=magazine_slug)
 
         if self.action == 'retrieve':
             qs = qs.prefetch_related(
-                'renders',
                 'issue_sections__section',
                 'issue_sections__segments',
             )
@@ -47,19 +64,30 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
                 if not lookup_value:
                     raise Http404("Edition not provided")
 
-                return queryset.get(
+                obj = queryset.get(
                     magazine__slug=magazine_slug,
                     edition__iexact=lookup_value
                 )
+                self.check_object_permissions(self.request, obj)
+                return obj
             except Issue.DoesNotExist:
                 raise Http404("Issue not found")
 
         return super().get_object()
 
     def get_serializer_class(self):
-        if self.action == 'list':
+        if self.action in ['list', 'recent']:
             return IssueListSerializer
         return IssueReaderSerializer
+
+    @action(detail=False, methods=['get'])
+    def recent(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        count = get_recent_count()
+        queryset = queryset.order_by('-publishing_date')[:count]
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['get'], url_path='pages/(?P<page>[^/.]+)')
     def page_detail(self, request, *args, **kwargs):

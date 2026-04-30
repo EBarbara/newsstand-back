@@ -62,8 +62,10 @@ class Page(models.Model):
     render = models.ForeignKey(RenderAsset, on_delete=models.SET_NULL, null=True)
 
     class Meta:
-        unique_together = ('issue', 'number')
         ordering = ['number']
+        constraints = [
+            models.UniqueConstraint(fields=['issue', 'number'], name='unique_page_number_per_issue')
+        ]
 
 
 class Section(models.Model):
@@ -95,15 +97,6 @@ class SectionSegment(models.Model):
     start_page = models.IntegerField()
     end_page = models.IntegerField()
 
-    def clean(self):
-        overlapping = SectionSegment.objects.filter(
-            issue_section__issue=self.issue_section.issue,
-            start_page__lte=self.start_page,
-            end_page__gte=self.end_page
-        ).exclude(issue_section=self.issue_section)
-
-        if overlapping.exists():
-            raise ValidationError("Page range overlaps with another section.")
 
 
 class Person(models.Model):
