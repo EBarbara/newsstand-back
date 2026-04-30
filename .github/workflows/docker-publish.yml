@@ -8,8 +8,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  # Transforma o nome do repositório (ex: Usuario/Repo) no nome da imagem Docker
   IMAGE_NAME: ${{ github.repository }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-and-push-image:
