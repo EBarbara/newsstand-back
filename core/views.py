@@ -28,8 +28,10 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
         if self.action in ['list', 'recent']:
             qs = qs.prefetch_related('renders')
 
-        # Use 'magazine_lookup' which is the default for NestedDefaultRouter with lookup='magazine'
-        magazine_slug = self.kwargs.get('magazine_lookup')
+        # rest_framework_nested standard is 'parent_lookup_<lookup>'
+        # but we also check 'magazine_lookup' just in case
+        magazine_slug = self.kwargs.get('parent_lookup_magazine') or self.kwargs.get('magazine_lookup')
+        
         if magazine_slug:
             qs = qs.filter(magazine__slug=magazine_slug)
 
@@ -45,11 +47,11 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = self.get_queryset()
         
         # Nested lookup
-        magazine_slug = self.kwargs.get('magazine_lookup')
+        magazine_slug = self.kwargs.get('parent_lookup_magazine') or self.kwargs.get('magazine_lookup')
         lookup_value = self.kwargs.get('pk')
 
         if magazine_slug and lookup_value:
-            # Try lookup by edition first (as requested)
+            # Try lookup by edition first
             try:
                 obj = queryset.get(
                     magazine__slug=magazine_slug,
@@ -58,7 +60,7 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
                 self.check_object_permissions(self.request, obj)
                 return obj
             except Issue.DoesNotExist:
-                # Fallback to ID if edition doesn't match and it's numeric
+                # Fallback to ID
                 if lookup_value.isdigit():
                     try:
                         obj = queryset.get(pk=lookup_value)
@@ -67,7 +69,7 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
                     except (Issue.DoesNotExist, ValueError):
                         pass
                 
-                raise Http404("Issue not found")
+                raise Http404(f"Issue {lookup_value} not found for magazine {magazine_slug}")
 
         return super().get_object()
 
