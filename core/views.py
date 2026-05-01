@@ -28,9 +28,12 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
         if self.action in ['list', 'recent']:
             qs = qs.prefetch_related('renders')
 
-        # rest_framework_nested standard is 'parent_lookup_<lookup>'
-        # but we also check 'magazine_lookup' just in case
-        magazine_slug = self.kwargs.get('parent_lookup_magazine') or self.kwargs.get('magazine_lookup')
+        # Try all common rest_framework_nested patterns
+        magazine_slug = (
+            self.kwargs.get('parent_lookup_magazine') or 
+            self.kwargs.get('magazine_pk') or 
+            self.kwargs.get('magazine_lookup')
+        )
         
         if magazine_slug:
             qs = qs.filter(magazine__slug=magazine_slug)
@@ -46,9 +49,20 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
     def get_object(self):
         queryset = self.get_queryset()
         
-        # Nested lookup
-        magazine_slug = self.kwargs.get('parent_lookup_magazine') or self.kwargs.get('magazine_lookup')
+        # Nested lookup debug
+        magazine_slug = (
+            self.kwargs.get('parent_lookup_magazine') or 
+            self.kwargs.get('magazine_pk') or 
+            self.kwargs.get('magazine_lookup')
+        )
         lookup_value = self.kwargs.get('pk')
+
+        # DEBUG: Isso vai aparecer no seu terminal do Docker/Django
+        print(f"\n--- DEBUG API LOOKUP ---")
+        print(f"KWARGS: {self.kwargs}")
+        print(f"MAGAZINE_SLUG FOUND: {magazine_slug}")
+        print(f"LOOKUP_VALUE: {lookup_value}")
+        print(f"------------------------\n")
 
         if magazine_slug and lookup_value:
             # Try lookup by edition first
