@@ -28,7 +28,8 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
         if self.action in ['list', 'recent']:
             qs = qs.prefetch_related('renders')
 
-        magazine_slug = self.kwargs.get('magazine_slug')
+        # Use 'magazine_lookup' which is the default for NestedDefaultRouter with lookup='magazine'
+        magazine_slug = self.kwargs.get('magazine_lookup')
         if magazine_slug:
             qs = qs.filter(magazine__slug=magazine_slug)
 
@@ -42,18 +43,14 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_object(self):
         queryset = self.get_queryset()
+        
+        # Nested lookup
+        magazine_slug = self.kwargs.get('magazine_lookup')
+        lookup_value = self.kwargs.get('pk')
 
-        magazine_slug = self.kwargs.get('magazine_slug')
-        lookup_field = 'pk'
-
-        # lookup por edição quando estiver dentro de magazine
-        if magazine_slug:
+        if magazine_slug and lookup_value:
+            # Try lookup by edition first (as requested)
             try:
-                lookup_value = self.kwargs.get('pk')
-
-                if not lookup_value:
-                    raise Http404("Edition not provided")
-
                 obj = queryset.get(
                     magazine__slug=magazine_slug,
                     edition__iexact=lookup_value
@@ -61,6 +58,15 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
                 self.check_object_permissions(self.request, obj)
                 return obj
             except Issue.DoesNotExist:
+                # Fallback to ID if edition doesn't match and it's numeric
+                if lookup_value.isdigit():
+                    try:
+                        obj = queryset.get(pk=lookup_value)
+                        self.check_object_permissions(self.request, obj)
+                        return obj
+                    except (Issue.DoesNotExist, ValueError):
+                        pass
+                
                 raise Http404("Issue not found")
 
         return super().get_object()
