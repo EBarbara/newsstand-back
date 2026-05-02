@@ -155,7 +155,7 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
         })
 
     @action(detail=True, methods=['post'], url_path='upload-page')
-    def upload_page(self, request, pk=None, magazine_magazine_slug=None):
+    def upload_page(self, request, *args, **kwargs):
         issue = self.get_object()
         file = request.FILES.get('file')
         order = int(request.data.get('order', issue.renders.count() + 1))
@@ -193,7 +193,7 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(IssueReaderSerializer(issue, context={'request': request}).data)
 
     @action(detail=True, methods=['post'], url_path='replace-page/(?P<render_pk>[^/.]+)')
-    def replace_page(self, request, pk=None, render_pk=None, magazine_magazine_slug=None):
+    def replace_page(self, request, render_pk=None, *args, **kwargs):
         issue = self.get_object()
         file = request.FILES.get('file')
         
@@ -213,7 +213,7 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(IssueReaderSerializer(issue, context={'request': request}).data)
 
     @action(detail=True, methods=['delete'], url_path='delete-page/(?P<render_pk>[^/.]+)')
-    def delete_page(self, request, pk=None, render_pk=None, magazine_magazine_slug=None):
+    def delete_page(self, request, render_pk=None, *args, **kwargs):
         issue = self.get_object()
         
         try:
