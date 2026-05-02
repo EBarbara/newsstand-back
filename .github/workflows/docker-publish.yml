@@ -3,6 +3,8 @@ name: Docker Build and Publish (Backend)
 on:
   push:
     branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
   # Permite rodar o workflow manualmente pela aba Actions do GitHub
   workflow_dispatch:
 
@@ -43,6 +45,6 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
