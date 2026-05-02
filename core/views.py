@@ -13,7 +13,7 @@ def get_recent_count():
 
 from PIL import Image
 from django.core.files.base import ContentFile
-from django.db import transaction
+from django.db import models, transaction
 from .models import Issue, Magazine, IssueSection, Section, RenderAsset, SectionSegment
 from .serializers import (
     IssueListSerializer,
