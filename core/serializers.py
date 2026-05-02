@@ -101,6 +101,9 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
 
         return instance
 
+    def to_representation(self, instance):
+        return IssueSectionSerializer(instance, context=self.context).data
+
 class PersonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Person
