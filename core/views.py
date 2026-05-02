@@ -157,7 +157,7 @@ class MagazineViewSet(viewsets.ReadOnlyModelViewSet):
     lookup_field = 'slug'
     lookup_url_kwarg = 'magazine_slug'
 
-class SectionViewSet(viewsets.ReadOnlyModelViewSet):
+class SectionViewSet(viewsets.ModelViewSet):
     queryset = Section.objects.all()
     serializer_class = SectionSerializer
 
