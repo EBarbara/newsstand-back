@@ -28,7 +28,7 @@ class IssueCoverMixin:
 class RenderSerializer(serializers.ModelSerializer):
     class Meta:
         model = RenderAsset
-        fields = ['order', 'image']
+        fields = ['id', 'order', 'image']
 
 class SectionSerializer(serializers.ModelSerializer):
     class Meta:

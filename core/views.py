@@ -11,7 +11,10 @@ from core.services import process_cbz_file
 def get_recent_count():
     return config('ISSUES_RECENT_COUNT', default=10, cast=int)
 
-from .models import Issue, Magazine, IssueSection, Section
+from PIL import Image
+from django.core.files.base import ContentFile
+from django.db import transaction
+from .models import Issue, Magazine, IssueSection, Section, RenderAsset, SectionSegment
 from .serializers import (
     IssueListSerializer,
     IssueReaderSerializer,
@@ -150,6 +153,99 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
                 "has_text": bool(issue_section.text_content)
             } if issue_section else None
         })
+
+    @action(detail=True, methods=['post'], url_path='upload-page')
+    def upload_page(self, request, pk=None, magazine_magazine_slug=None):
+        issue = self.get_object()
+        file = request.FILES.get('file')
+        order = int(request.data.get('order', issue.renders.count() + 1))
+
+        if not file:
+            return Response({"error": "No file provided"}, status=400)
+
+        with transaction.atomic():
+            # Shift existing pages
+            issue.renders.filter(order__gte=order).update(order=models.F('order') + 1)
+
+            # Shift segments
+            segments = SectionSegment.objects.filter(issue_section__issue=issue)
+            for seg in segments:
+                if seg.start_page >= order:
+                    seg.start_page += 1
+                    seg.end_page += 1
+                    seg.save()
+                elif seg.start_page < order <= seg.end_page:
+                    seg.end_page += 1
+                    seg.save()
+
+            # Create new render
+            img = Image.open(file)
+            width, height = img.size
+            
+            render = RenderAsset.objects.create(
+                issue=issue,
+                order=order,
+                width=width,
+                height=height,
+                image=file
+            )
+
+        return Response(IssueReaderSerializer(issue, context={'request': request}).data)
+
+    @action(detail=True, methods=['post'], url_path='replace-page/(?P<render_pk>[^/.]+)')
+    def replace_page(self, request, pk=None, render_pk=None, magazine_magazine_slug=None):
+        issue = self.get_object()
+        file = request.FILES.get('file')
+        
+        try:
+            render = issue.renders.get(pk=render_pk)
+        except RenderAsset.DoesNotExist:
+            return Response({"error": "Page not found"}, status=404)
+
+        if not file:
+            return Response({"error": "No file provided"}, status=400)
+
+        img = Image.open(file)
+        render.width, render.height = img.size
+        render.image = file
+        render.save()
+
+        return Response(IssueReaderSerializer(issue, context={'request': request}).data)
+
+    @action(detail=True, methods=['delete'], url_path='delete-page/(?P<render_pk>[^/.]+)')
+    def delete_page(self, request, pk=None, render_pk=None, magazine_magazine_slug=None):
+        issue = self.get_object()
+        
+        try:
+            render = issue.renders.get(pk=render_pk)
+        except RenderAsset.DoesNotExist:
+            return Response({"error": "Page not found"}, status=404)
+
+        order = render.order
+
+        with transaction.atomic():
+            render.delete()
+
+            # Shift segments
+            segments = SectionSegment.objects.filter(issue_section__issue=issue)
+            for seg in segments:
+                if seg.start_page == order and seg.end_page == order:
+                    seg.delete()
+                elif seg.start_page <= order <= seg.end_page:
+                    seg.end_page -= 1
+                    if seg.start_page > seg.end_page:
+                        seg.delete()
+                    else:
+                        seg.save()
+                elif seg.start_page > order:
+                    seg.start_page -= 1
+                    seg.end_page -= 1
+                    seg.save()
+
+            # Shift remaining pages
+            issue.renders.filter(order__gt=order).update(order=models.F('order') - 1)
+
+        return Response(IssueReaderSerializer(issue, context={'request': request}).data)
 
 class MagazineViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Magazine.objects.all()
