@@ -144,6 +144,7 @@ class PersonCreditSerializer(serializers.ModelSerializer):
     magazine_slug = serializers.CharField(source='issue_section.issue.magazine.slug', read_only=True)
     issue_edition = serializers.CharField(source='issue_section.issue.edition', read_only=True)
     issue_id = serializers.IntegerField(source='issue_section.issue.id', read_only=True)
+    issue_cover = serializers.ImageField(source='issue_section.issue.cover', read_only=True)
     section_title = serializers.CharField(source='issue_section.title', read_only=True)
     section_type = serializers.CharField(source='issue_section.section.name', read_only=True)
 
@@ -155,7 +156,8 @@ class PersonCreditSerializer(serializers.ModelSerializer):
             'magazine_name', 
             'magazine_slug', 
             'issue_edition', 
-            'issue_id',
+            'issue_id', 
+            'issue_cover',
             'section_title', 
             'section_type'
         ]
