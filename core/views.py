@@ -120,6 +120,32 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = self.get_serializer(issue)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    @action(detail=False, methods=['post'])
+    def create_empty(self, request, *args, **kwargs):
+        magazine_slug = request.data.get('magazine')
+        edition = request.data.get('edition')
+        publishing_date = request.data.get('date')
+
+        if not all([magazine_slug, edition, publishing_date]):
+            return Response({"error": "magazine, edition and date are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            magazine = Magazine.objects.get(slug=magazine_slug)
+        except Magazine.DoesNotExist:
+            return Response({"error": f"Magazine {magazine_slug} not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            issue = Issue.objects.create(
+                magazine=magazine,
+                edition=edition,
+                publishing_date=publishing_date,
+            )
+        except Exception as e:
+            return Response({"error": f"Failed to create issue: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = self.get_serializer(issue)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
     @action(detail=True, methods=['get'], url_path='pages/(?P<page>[^/.]+)')
     def page_detail(self, request, *args, **kwargs):
         issue = self.get_object()
