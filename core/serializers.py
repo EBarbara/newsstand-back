@@ -144,7 +144,7 @@ class PersonCreditSerializer(serializers.ModelSerializer):
     magazine_slug = serializers.CharField(source='issue_section.issue.magazine.slug', read_only=True)
     issue_edition = serializers.CharField(source='issue_section.issue.edition', read_only=True)
     issue_id = serializers.IntegerField(source='issue_section.issue.id', read_only=True)
-    issue_cover = serializers.SerializerMethodField()
+    issue_cover = serializers.SerializerMethodField(method_name='get_cover_image')
     section_title = serializers.CharField(source='issue_section.title', read_only=True)
     section_type = serializers.CharField(source='issue_section.section.name', read_only=True)
 
@@ -162,12 +162,19 @@ class PersonCreditSerializer(serializers.ModelSerializer):
             'section_type'
         ]
 
-    def get_issue_cover(self, obj):
-        # The cover is the first rendered page of the issue (order 0)
-        issue = obj.issue_section.issue
-        first_page = issue.renders.filter(order=0).first()
-        if first_page:
-            return first_page.image.url
+    def get_cover_image(self, obj):
+        try:
+            issue = obj.issue_section.issue
+            # Try to find the first page (order 0)
+            cover = issue.renders.filter(order=0).first()
+            # Fallback to the first render available if order 0 is missing
+            if not cover:
+                cover = issue.renders.all().first()
+            
+            if cover and cover.image:
+                return cover.image.url
+        except Exception:
+            pass
         return None
 
 class CreditSerializer(serializers.ModelSerializer):
