@@ -144,7 +144,7 @@ class PersonCreditSerializer(serializers.ModelSerializer):
     magazine_slug = serializers.CharField(source='issue_section.issue.magazine.slug', read_only=True)
     issue_edition = serializers.CharField(source='issue_section.issue.edition', read_only=True)
     issue_id = serializers.IntegerField(source='issue_section.issue.id', read_only=True)
-    issue_cover = serializers.ImageField(source='issue_section.issue.cover', read_only=True)
+    issue_cover = serializers.SerializerMethodField()
     section_title = serializers.CharField(source='issue_section.title', read_only=True)
     section_type = serializers.CharField(source='issue_section.section.name', read_only=True)
 
@@ -161,6 +161,14 @@ class PersonCreditSerializer(serializers.ModelSerializer):
             'section_title', 
             'section_type'
         ]
+
+    def get_issue_cover(self, obj):
+        # The cover is the first rendered page of the issue (order 0)
+        issue = obj.issue_section.issue
+        first_page = issue.renders.filter(order=0).first()
+        if first_page:
+            return first_page.image.url
+        return None
 
 class CreditSerializer(serializers.ModelSerializer):
     person = PersonSerializer(read_only=True)
