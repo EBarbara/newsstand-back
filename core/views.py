@@ -164,8 +164,11 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({"error": "No file provided"}, status=400)
 
         with transaction.atomic():
-            # Shift existing pages
-            issue.renders.filter(order__gte=order).update(order=models.F('order') + 1)
+            # Shift existing pages in reverse order to avoid unique constraint violations
+            renders_to_shift = issue.renders.filter(order__gte=order).order_by('-order')
+            for r in renders_to_shift:
+                r.order += 1
+                r.save()
 
             # Shift segments
             segments = SectionSegment.objects.filter(issue_section__issue=issue)
@@ -242,8 +245,11 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
                     seg.end_page -= 1
                     seg.save()
 
-            # Shift remaining pages
-            issue.renders.filter(order__gt=order).update(order=models.F('order') - 1)
+            # Shift remaining pages in ascending order
+            renders_to_shift = issue.renders.filter(order__gt=order).order_by('order')
+            for r in renders_to_shift:
+                r.order -= 1
+                r.save()
 
         return Response(IssueReaderSerializer(issue, context={'request': request}).data)
 
