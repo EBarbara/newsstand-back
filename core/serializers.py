@@ -70,6 +70,20 @@ class PersonDetailSerializer(serializers.ModelSerializer):
             'credits'
         ]
 
+    def to_internal_value(self, data):
+        # When sending links as a JSON string in FormData (multipart), 
+        # we need to parse it manually before validation.
+        if 'links' in data and isinstance(data.get('links'), str):
+            import json
+            try:
+                # If it's a QueryDict (standard for multipart), we need to make it mutable
+                if hasattr(data, 'copy'):
+                    data = data.copy()
+                data['links'] = json.loads(data['links'])
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return super().to_internal_value(data)
+
     def get_credits(self, obj):
         credits = Credit.objects.filter(person=obj).select_related(
             'issue_section__issue__magazine',
@@ -81,21 +95,6 @@ class PersonDetailSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         links_data = validated_data.pop('links', None)
         
-        # If links_data is a list of strings (happens with some multipart parsers) 
-        # or if it was passed as a JSON string in a multipart request
-        if isinstance(links_data, list) and len(links_data) == 1 and isinstance(links_data[0], str):
-            try:
-                import json
-                links_data = json.loads(links_data[0])
-            except (ValueError, TypeError):
-                pass
-        elif isinstance(links_data, str):
-            try:
-                import json
-                links_data = json.loads(links_data)
-            except (ValueError, TypeError):
-                pass
-
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
