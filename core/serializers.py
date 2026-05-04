@@ -97,23 +97,25 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data: dict) -> IssueSection:
-        segments_data = validated_data.pop('segments', [])
-        credits_data = validated_data.pop('credits', [])
+        segments_data = validated_data.pop('segments', None)
+        credits_data = validated_data.pop('credits', None)
         
         issue_section = IssueSection.objects.create(**validated_data)
 
-        for seg in segments_data:
-            SectionSegment.objects.create(issue_section=issue_section, **seg)
+        if segments_data:
+            for seg in segments_data:
+                SectionSegment.objects.create(issue_section=issue_section, **seg)
             
-        for credit in credits_data:
-            Credit.objects.create(issue_section=issue_section, **credit)
+        if credits_data:
+            for credit in credits_data:
+                Credit.objects.create(issue_section=issue_section, **credit)
 
         return issue_section
 
     @transaction.atomic
     def update(self, instance: IssueSection, validated_data: dict) -> IssueSection:
-        segments_data = validated_data.pop('segments', [])
-        credits_data = validated_data.pop('credits', [])
+        segments_data = validated_data.pop('segments', None)
+        credits_data = validated_data.pop('credits', None)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
