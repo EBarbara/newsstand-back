@@ -101,6 +101,10 @@ class SectionSegment(models.Model):
 
 class Person(models.Model):
     name = models.CharField(max_length=255, unique=True, verbose_name='Name')
+    birth_date = models.DateField(null=True, blank=True, verbose_name='Birth Date')
+    country = models.CharField(max_length=255, null=True, blank=True, verbose_name='Country')
+    biography = models.TextField(null=True, blank=True, verbose_name='Biography')
+    photo = models.ImageField(upload_to='people/', null=True, blank=True, verbose_name='Photo')
 
     class Meta:
         verbose_name = 'Person'
@@ -109,6 +113,15 @@ class Person(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+class PersonLink(models.Model):
+    person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name='links')
+    url = models.URLField()
+    label = models.CharField(max_length=255)
+
+    def __str__(self) -> str:
+        return f"{self.label} ({self.person.name})"
 
 
 class Credit(models.Model):

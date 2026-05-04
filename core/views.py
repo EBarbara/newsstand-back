@@ -23,6 +23,7 @@ from .serializers import (
     MagazineSerializer,
     SectionSerializer,
     PersonSerializer,
+    PersonDetailSerializer,
 )
 
 
@@ -284,3 +285,8 @@ class PersonViewSet(viewsets.ModelViewSet):
     serializer_class = PersonSerializer
     filterset_fields = ['name']
     search_fields = ['name']
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return PersonDetailSerializer
+        return PersonSerializer

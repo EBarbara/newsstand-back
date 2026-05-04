@@ -5,7 +5,7 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework.request import Request
 
-from .models import Issue, IssueSection, Section, Person, Credit, Magazine, RenderAsset, SectionSegment
+from .models import Issue, IssueSection, Section, Person, Credit, Magazine, RenderAsset, SectionSegment, PersonLink
 
 class IssueCoverMixin:
     context: dict
@@ -43,7 +43,58 @@ class SectionSegmentSerializer(serializers.ModelSerializer):
 class PersonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Person
-        fields = ['id', 'name', ]
+        fields = ['id', 'name', 'photo']
+
+class PersonLinkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PersonLink
+        fields = ['id', 'url', 'label']
+
+class PersonDetailSerializer(serializers.ModelSerializer):
+    links = PersonLinkSerializer(many=True, read_only=True)
+    # We'll use a SerializerMethodField to get credits with issue info
+    credits = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Person
+        fields = [
+            'id', 
+            'name', 
+            'birth_date', 
+            'country', 
+            'biography', 
+            'photo', 
+            'links', 
+            'credits'
+        ]
+
+    def get_credits(self, obj):
+        credits = Credit.objects.filter(person=obj).select_related(
+            'issue_section__issue__magazine',
+            'issue_section__section'
+        )
+        return PersonCreditSerializer(credits, many=True, context=self.context).data
+
+class PersonCreditSerializer(serializers.ModelSerializer):
+    magazine_name = serializers.CharField(source='issue_section.issue.magazine.name', read_only=True)
+    magazine_slug = serializers.CharField(source='issue_section.issue.magazine.slug', read_only=True)
+    issue_edition = serializers.CharField(source='issue_section.issue.edition', read_only=True)
+    issue_id = serializers.IntegerField(source='issue_section.issue.id', read_only=True)
+    section_title = serializers.CharField(source='issue_section.title', read_only=True)
+    section_type = serializers.CharField(source='issue_section.section.name', read_only=True)
+
+    class Meta:
+        model = Credit
+        fields = [
+            'id', 
+            'role', 
+            'magazine_name', 
+            'magazine_slug', 
+            'issue_edition', 
+            'issue_id',
+            'section_title', 
+            'section_type'
+        ]
 
 class CreditSerializer(serializers.ModelSerializer):
     person = PersonSerializer(read_only=True)
