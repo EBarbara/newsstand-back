@@ -14,7 +14,7 @@ def get_recent_count():
 from PIL import Image
 from django.core.files.base import ContentFile
 from django.db import models, transaction
-from .models import Issue, Magazine, IssueSection, Section, RenderAsset, SectionSegment
+from .models import Issue, Magazine, IssueSection, Section, RenderAsset, SectionSegment, Person
 from .serializers import (
     IssueListSerializer,
     IssueReaderSerializer,
@@ -22,6 +22,7 @@ from .serializers import (
     IssueSectionSerializer,
     MagazineSerializer,
     SectionSerializer,
+    PersonSerializer,
 )
 
 
@@ -277,3 +278,9 @@ class IssueSectionViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(issue_id=self.kwargs['issue_pk'])
+
+class PersonViewSet(viewsets.ModelViewSet):
+    queryset = Person.objects.all()
+    serializer_class = PersonSerializer
+    filterset_fields = ['name']
+    search_fields = ['name']
