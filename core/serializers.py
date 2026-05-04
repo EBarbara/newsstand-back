@@ -43,7 +43,7 @@ class SectionSegmentSerializer(serializers.ModelSerializer):
 class PersonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Person
-        fields = ['id', 'name', 'photo']
+        fields = ['id', 'name', 'photo', 'photo_focus_x', 'photo_focus_y']
 
 class PersonLinkSerializer(serializers.ModelSerializer):
     class Meta:
@@ -64,6 +64,8 @@ class PersonDetailSerializer(serializers.ModelSerializer):
             'country', 
             'biography', 
             'photo', 
+            'photo_focus_x',
+            'photo_focus_y',
             'links', 
             'credits'
         ]

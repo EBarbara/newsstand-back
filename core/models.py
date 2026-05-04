@@ -105,6 +105,8 @@ class Person(models.Model):
     country = models.CharField(max_length=255, null=True, blank=True, verbose_name='Country')
     biography = models.TextField(null=True, blank=True, verbose_name='Biography')
     photo = models.ImageField(upload_to='people/', null=True, blank=True, verbose_name='Photo')
+    photo_focus_x = models.IntegerField(default=50, verbose_name='Photo Focus X (%)')
+    photo_focus_y = models.IntegerField(default=50, verbose_name='Photo Focus Y (%)')
 
     class Meta:
         verbose_name = 'Person'
