@@ -51,7 +51,7 @@ class PersonLinkSerializer(serializers.ModelSerializer):
         fields = ['id', 'url', 'label']
 
 class PersonDetailSerializer(serializers.ModelSerializer):
-    links = PersonLinkSerializer(many=True, read_only=True)
+    links = PersonLinkSerializer(many=True, required=False)
     # We'll use a SerializerMethodField to get credits with issue info
     credits = serializers.SerializerMethodField()
 
@@ -74,6 +74,39 @@ class PersonDetailSerializer(serializers.ModelSerializer):
             'issue_section__section'
         )
         return PersonCreditSerializer(credits, many=True, context=self.context).data
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        links_data = validated_data.pop('links', None)
+        
+        # If links_data is a list of strings (happens with some multipart parsers) 
+        # or if it was passed as a JSON string in a multipart request
+        if isinstance(links_data, list) and len(links_data) == 1 and isinstance(links_data[0], str):
+            try:
+                import json
+                links_data = json.loads(links_data[0])
+            except (ValueError, TypeError):
+                pass
+        elif isinstance(links_data, str):
+            try:
+                import json
+                links_data = json.loads(links_data)
+            except (ValueError, TypeError):
+                pass
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if links_data is not None:
+            instance.links.all().delete()
+            for link in links_data:
+                # Remove id if present to avoid integrity errors on recreation
+                if isinstance(link, dict):
+                    link.pop('id', None)
+                    PersonLink.objects.create(person=instance, **link)
+                
+        return instance
 
 class PersonCreditSerializer(serializers.ModelSerializer):
     magazine_name = serializers.CharField(source='issue_section.issue.magazine.name', read_only=True)
