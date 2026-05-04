@@ -71,17 +71,19 @@ class PersonDetailSerializer(serializers.ModelSerializer):
         ]
 
     def to_internal_value(self, data):
-        # When sending links as a JSON string in FormData (multipart), 
-        # we need to parse it manually before validation.
-        if 'links' in data and isinstance(data.get('links'), str):
-            import json
+        # Create a mutable copy of the data if it's a QueryDict
+        if hasattr(data, 'copy'):
+            data = data.copy()
+
+        # Handle links passed as a JSON string (common in multipart/form-data)
+        links = data.get('links')
+        if isinstance(links, str):
             try:
-                # If it's a QueryDict (standard for multipart), we need to make it mutable
-                if hasattr(data, 'copy'):
-                    data = data.copy()
-                data['links'] = json.loads(data['links'])
+                import json
+                data['links'] = json.loads(links)
             except (json.JSONDecodeError, TypeError):
                 pass
+        
         return super().to_internal_value(data)
 
     def get_credits(self, obj):
@@ -93,19 +95,24 @@ class PersonDetailSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
+        # Pop links_data so it's not handled by the default update
         links_data = validated_data.pop('links', None)
         
+        # Update main instance fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
         
+        # If links were provided (even as an empty list), we update them
         if links_data is not None:
             instance.links.all().delete()
             for link in links_data:
-                # Remove id if present to avoid integrity errors on recreation
                 if isinstance(link, dict):
+                    # Remove id to avoid conflicts when recreating
                     link.pop('id', None)
-                    PersonLink.objects.create(person=instance, **link)
+                    # We only create if both fields are present
+                    if link.get('url') and link.get('label'):
+                        PersonLink.objects.create(person=instance, **link)
                 
         return instance
 
