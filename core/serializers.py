@@ -80,7 +80,12 @@ class PersonDetailSerializer(serializers.ModelSerializer):
         if isinstance(links, str):
             try:
                 import json
-                data['links'] = json.loads(links)
+                parsed_links = json.loads(links)
+                # QueryDict requires setlist to handle lists correctly
+                if hasattr(data, 'setlist'):
+                    data.setlist('links', parsed_links)
+                else:
+                    data['links'] = parsed_links
             except (json.JSONDecodeError, TypeError):
                 pass
         
@@ -95,24 +100,42 @@ class PersonDetailSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        # Pop links_data so it's not handled by the default update
+        # Pop links_data from validated_data
         links_data = validated_data.pop('links', None)
         
+        # Fallback: if links_data is None, try to get it from initial_data
+        # This covers cases where DRF validation might have skipped or failed the nested field
+        if links_data is None and 'links' in self.initial_data:
+            links_raw = self.initial_data.get('links')
+            if isinstance(links_raw, str):
+                try:
+                    import json
+                    links_data = json.loads(links_raw)
+                except:
+                    pass
+            elif isinstance(links_raw, list):
+                links_data = links_raw
+
         # Update main instance fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
         
-        # If links were provided (even as an empty list), we update them
+        # Perform links update if data was provided
         if links_data is not None:
             instance.links.all().delete()
             for link in links_data:
                 if isinstance(link, dict):
-                    # Remove id to avoid conflicts when recreating
-                    link.pop('id', None)
-                    # We only create if both fields are present
-                    if link.get('url') and link.get('label'):
-                        PersonLink.objects.create(person=instance, **link)
+                    # Clean the dict to only include valid fields for PersonLink
+                    # and remove ID to avoid conflicts
+                    url = link.get('url')
+                    label = link.get('label')
+                    if url and label:
+                        PersonLink.objects.create(
+                            person=instance, 
+                            url=url, 
+                            label=label
+                        )
                 
         return instance
 
