@@ -40,9 +40,27 @@ class SectionSegmentSerializer(serializers.ModelSerializer):
         model = SectionSegment
         fields = ['start_page', 'end_page']
 
+class PersonSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Person
+        fields = ['id', 'name', ]
+
+class CreditSerializer(serializers.ModelSerializer):
+    person = PersonSerializer(read_only=True)
+    person_id = serializers.PrimaryKeyRelatedField(
+        queryset=Person.objects.all(),
+        source='person',
+        write_only=True
+    )
+
+    class Meta:
+        model = Credit
+        fields = ['id', 'person', 'person_id', 'role', ]
+
 class IssueSectionSerializer(serializers.ModelSerializer):
     section = SectionSerializer(read_only=True)
     segments = SectionSegmentSerializer(many=True, read_only=True)
+    credits = CreditSerializer(many=True, read_only=True)
 
     class Meta:
         model = IssueSection
@@ -52,6 +70,7 @@ class IssueSectionSerializer(serializers.ModelSerializer):
             'title',
             'text_content',
             'segments',
+            'credits',
             'order',
         ]
 
@@ -62,10 +81,11 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
     )
 
     segments = SectionSegmentSerializer(many=True)
+    credits = CreditSerializer(many=True, required=False)
 
     class Meta:
         model = IssueSection
-        fields = ['id', 'section_id', 'title', 'text_content', 'order', 'segments']
+        fields = ['id', 'section_id', 'title', 'text_content', 'order', 'segments', 'credits']
 
     def validate_segments(self, value):
         for seg in value:
@@ -78,16 +98,22 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data: dict) -> IssueSection:
         segments_data = validated_data.pop('segments', [])
+        credits_data = validated_data.pop('credits', [])
+        
         issue_section = IssueSection.objects.create(**validated_data)
 
         for seg in segments_data:
             SectionSegment.objects.create(issue_section=issue_section, **seg)
+            
+        for credit in credits_data:
+            Credit.objects.create(issue_section=issue_section, **credit)
 
         return issue_section
 
     @transaction.atomic
     def update(self, instance: IssueSection, validated_data: dict) -> IssueSection:
         segments_data = validated_data.pop('segments', [])
+        credits_data = validated_data.pop('credits', [])
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -95,19 +121,18 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
 
         if segments_data is not None:
             instance.segments.all().delete()
-
             for seg in segments_data:
                 SectionSegment.objects.create(issue_section=instance, **seg)
+                
+        if credits_data is not None:
+            instance.credits.all().delete()
+            for credit in credits_data:
+                Credit.objects.create(issue_section=instance, **credit)
 
         return instance
 
     def to_representation(self, instance):
         return IssueSectionSerializer(instance, context=self.context).data
-
-class PersonSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Person
-        fields = ['id', 'name', ]
 
 class MagazineSerializer(serializers.ModelSerializer):
     class Meta:
@@ -139,15 +164,3 @@ class IssueReaderSerializer(IssueCoverMixin, serializers.ModelSerializer):
             'renders',
             'sections',
         ]
-
-class CreditSerializer(serializers.ModelSerializer):
-    person = PersonSerializer(read_only=True)
-    person_id = serializers.PrimaryKeyRelatedField(
-        queryset=Person.objects.all(),
-        source='person',
-        write_only=True
-    )
-
-    class Meta:
-        model = Credit
-        fields = ['id', 'person', 'person_id', 'role', ]
