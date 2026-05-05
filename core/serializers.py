@@ -153,6 +153,7 @@ class PersonCreditSerializer(serializers.ModelSerializer):
         fields = [
             'id', 
             'role', 
+            'importance',
             'magazine_name', 
             'magazine_slug', 
             'issue_edition', 
@@ -186,7 +187,7 @@ class CreditSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Credit
-        fields = ['id', 'person', 'person_id', 'role', ]
+        fields = ['id', 'person', 'person_id', 'role', 'importance']
 
 class IssueSectionSerializer(serializers.ModelSerializer):
     section = SectionSerializer(read_only=True)

@@ -127,6 +127,12 @@ class PersonLink(models.Model):
 
 
 class Credit(models.Model):
+    IMPORTANCE_CHOICES = [
+        (1, 'Major'),      # Protagonist / Star
+        (2, 'Regular'),    # Contributor (Photographer, Writer)
+        (3, 'Minor'),      # Mention / Click / Paparazzi
+    ]
+
     person = models.ForeignKey(Person, on_delete=models.CASCADE, verbose_name='Person')
     issue_section = models.ForeignKey(
         IssueSection,
@@ -135,12 +141,14 @@ class Credit(models.Model):
         related_name='credits'
     )
     role = models.CharField(max_length=255, null=True, blank=True, verbose_name='Role')
+    importance = models.IntegerField(choices=IMPORTANCE_CHOICES, default=2, verbose_name='Importance')
 
     class Meta:
         verbose_name = 'Credit'
         verbose_name_plural = 'Credits'
-        ordering = ['issue_section__issue__publishing_date', 'issue_section__id', 'role', 'person__name' ]
+        ordering = ['importance', 'issue_section__issue__publishing_date', 'issue_section__id', 'role', 'person__name' ]
 
     def __str__(self) -> str:
         role_text = f' as {self.role}' if self.role else ''
-        return f"{self.person}{role_text} in {self.issue_section}"
+        importance_text = f' [{self.get_importance_display()}]'
+        return f"{self.person}{role_text}{importance_text} in {self.issue_section}"
