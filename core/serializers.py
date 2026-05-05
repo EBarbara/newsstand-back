@@ -164,13 +164,15 @@ class PersonCreditSerializer(serializers.ModelSerializer):
             'issue_cover',
             'section_title', 
             'section_type',
-            'start_page'
+            'start_page',
+            'render_ids'
         ]
 
     def get_start_page(self, obj):
-        # If the credit is anchored to a specific page, return its order
-        if obj.render:
-            return obj.render.order
+        # If the credit is anchored to specific pages, return the order of the first one
+        first_render = obj.renders.order_by('order').first()
+        if first_render:
+            return first_render.order
             
         # Fallback to the first segment of the section
         first_segment = obj.issue_section.segments.order_by('start_page').first()
@@ -197,16 +199,16 @@ class CreditSerializer(serializers.ModelSerializer):
         queryset=Person.objects.all(),
         source='person'
     )
-    render_id = serializers.PrimaryKeyRelatedField(
+    render_ids = serializers.PrimaryKeyRelatedField(
         queryset=RenderAsset.objects.all(),
-        source='render',
-        required=False,
-        allow_null=True
+        source='renders',
+        many=True,
+        required=False
     )
 
     class Meta:
         model = Credit
-        fields = ['id', 'person', 'person_id', 'role', 'importance', 'render_id']
+        fields = ['id', 'person', 'person_id', 'role', 'importance', 'render_ids']
 
 class IssueSectionSerializer(serializers.ModelSerializer):
     section = SectionSerializer(read_only=True)
@@ -267,7 +269,9 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
             
         if credits_data:
             for credit in credits_data:
-                Credit.objects.create(issue_section=issue_section, **credit)
+                renders = credit.pop('renders', [])
+                c = Credit.objects.create(issue_section=issue_section, **credit)
+                c.renders.set(renders)
 
         return issue_section
 
@@ -288,7 +292,9 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
         if credits_data is not None:
             instance.credits.all().delete()
             for credit in credits_data:
-                Credit.objects.create(issue_section=instance, **credit)
+                renders = credit.pop('renders', [])
+                c = Credit.objects.create(issue_section=instance, **credit)
+                c.renders.set(renders)
 
         return instance
 
