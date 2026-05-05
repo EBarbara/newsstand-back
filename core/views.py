@@ -319,7 +319,7 @@ class PersonViewSet(viewsets.ModelViewSet):
         return PersonSerializer
 
     @action(detail=True, methods=['get'])
-    def credits(self, request, pk=None):
+    def credits(self, request, pk=None, **kwargs):
         person = self.get_object()
         credits = Credit.objects.filter(person=person).select_related(
             'issue_section__issue__magazine',
