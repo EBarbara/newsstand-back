@@ -1,5 +1,5 @@
 from django.http import Http404
-from rest_framework import viewsets
+from rest_framework import viewsets, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from decouple import config
@@ -308,10 +308,11 @@ class IssueSectionViewSet(viewsets.ModelViewSet):
         serializer.save(issue_id=self.kwargs['issue_pk'])
 
 class PersonViewSet(viewsets.ModelViewSet):
-    queryset = Person.objects.all()
+    queryset = Person.objects.all().order_by('name')
     serializer_class = PersonSerializer
-    filterset_fields = ['name']
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name']
+    ordering_fields = ['name', 'created_at']
 
     def get_serializer_class(self):
         if self.action in ['retrieve', 'update', 'partial_update']:
