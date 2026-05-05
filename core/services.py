@@ -51,8 +51,8 @@ def parse_cbz_filename(filename: str) -> ParsedCBZ:
     year_match = re.search(r"Vol\.(\d{4})", name)
     year = int(year_match.group(1)) if year_match else None
 
-    # --- edição (#01)
-    edition_match = re.search(r"#(\d+)", name)
+    # --- edição (#105A)
+    edition_match = re.search(r"#([a-zA-Z0-9]+)", name)
     edition = edition_match.group(1).zfill(2) if edition_match else None
 
     # --- mês e ano textual (August, 1975)
