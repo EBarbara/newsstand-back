@@ -18,6 +18,7 @@ issues_router.register(r'sections', IssueSectionViewSet, basename='issue-section
 
 urlpatterns = [
     path('api/<str:version>/issues/recent/', IssueViewSet.as_view({'get': 'recent'})),
+    path('api/<str:version>/issues/create_empty/', IssueViewSet.as_view({'post': 'create_empty'})),
     path('api/<str:version>/', include(router.urls)),
     path('api/<str:version>/', include(magazines_router.urls)),
     path('api/<str:version>/', include(issues_router.urls)),

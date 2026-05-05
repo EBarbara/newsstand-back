@@ -3,7 +3,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from decouple import config
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework import status
 
 from core.services import process_cbz_file
@@ -120,7 +120,7 @@ class IssueViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = self.get_serializer(issue)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=['post'], parser_classes=[JSONParser])
     def create_empty(self, request, *args, **kwargs):
         magazine_slug = request.data.get('magazine')
         edition = request.data.get('edition')
