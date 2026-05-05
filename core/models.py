@@ -22,6 +22,8 @@ class Issue(models.Model):
     edition = models.CharField(max_length=255, null=True, blank=True)
 
     source_file = models.CharField(max_length=1000, null=True, blank=True)
+    has_physical_copy = models.BooleanField(default=False, verbose_name='Has Physical Copy')
+    is_digital_complete = models.BooleanField(default=False, verbose_name='Is Digital Complete')
 
     class Meta:
         verbose_name = 'Issue'

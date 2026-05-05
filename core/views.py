@@ -27,7 +27,7 @@ from .serializers import (
 )
 
 
-class IssueViewSet(viewsets.ReadOnlyModelViewSet):
+class IssueViewSet(viewsets.ModelViewSet):
     queryset = Issue.objects.all()
 
     def get_queryset(self):
