@@ -102,18 +102,27 @@ class SectionSegment(models.Model):
 
 
 class Person(models.Model):
-    name = models.CharField(max_length=255, unique=True, verbose_name='Name')
+    name = models.CharField(max_length=255, verbose_name='Name')
+    disambiguation = models.CharField(max_length=255, null=True, blank=True, verbose_name='Disambiguation')
     birth_date = models.DateField(null=True, blank=True, verbose_name='Birth Date')
     country = models.CharField(max_length=255, null=True, blank=True, verbose_name='Country')
     biography = models.TextField(null=True, blank=True, verbose_name='Biography')
     photo = models.ImageField(upload_to='people/', null=True, blank=True, verbose_name='Photo')
     photo_focus_x = models.IntegerField(default=50, verbose_name='Photo Focus X (%)')
     photo_focus_y = models.IntegerField(default=50, verbose_name='Photo Focus Y (%)')
+    aliases = models.JSONField(default=list, blank=True, verbose_name='Aliases')
 
     class Meta:
         verbose_name = 'Person'
         verbose_name_plural = 'People'
         ordering = ['name']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['name', 'disambiguation'], 
+                name='unique_person_name_disambiguation',
+                nulls_distinct=False
+            )
+        ]
 
     def __str__(self) -> str:
         return self.name

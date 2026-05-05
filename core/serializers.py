@@ -43,7 +43,7 @@ class SectionSegmentSerializer(serializers.ModelSerializer):
 class PersonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Person
-        fields = ['id', 'name', 'photo', 'photo_focus_x', 'photo_focus_y']
+        fields = ['id', 'name', 'photo', 'photo_focus_x', 'photo_focus_y', 'aliases', 'disambiguation']
 
 class PersonLinkSerializer(serializers.ModelSerializer):
     class Meta:
@@ -60,12 +60,14 @@ class PersonDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 
             'name', 
+            'disambiguation',
             'birth_date', 
             'country', 
             'biography', 
             'photo', 
             'photo_focus_x',
             'photo_focus_y',
+            'aliases',
             'links', 
             'credits'
         ]
@@ -86,6 +88,19 @@ class PersonDetailSerializer(serializers.ModelSerializer):
                     data.setlist('links', parsed_links)
                 else:
                     data['links'] = parsed_links
+            except (json.JSONDecodeError, TypeError):
+                pass
+        
+        # Handle aliases passed as a JSON string
+        aliases = data.get('aliases')
+        if isinstance(aliases, str):
+            try:
+                import json
+                parsed_aliases = json.loads(aliases)
+                if hasattr(data, 'setlist'):
+                    data.setlist('aliases', parsed_aliases)
+                else:
+                    data['aliases'] = parsed_aliases
             except (json.JSONDecodeError, TypeError):
                 pass
         

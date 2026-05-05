@@ -311,7 +311,7 @@ class PersonViewSet(viewsets.ModelViewSet):
     queryset = Person.objects.all().order_by('name')
     serializer_class = PersonSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['name']
+    search_fields = ['name', 'aliases', 'disambiguation']
     ordering_fields = ['name', 'created_at']
 
     def get_serializer_class(self):
