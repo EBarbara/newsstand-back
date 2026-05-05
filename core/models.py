@@ -142,6 +142,14 @@ class Credit(models.Model):
     )
     role = models.CharField(max_length=255, null=True, blank=True, verbose_name='Role')
     importance = models.IntegerField(choices=IMPORTANCE_CHOICES, default=2, verbose_name='Importance')
+    render = models.ForeignKey(
+        'RenderAsset', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='credits', 
+        verbose_name='Specific Page'
+    )
 
     class Meta:
         verbose_name = 'Credit'

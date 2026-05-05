@@ -166,6 +166,11 @@ class PersonCreditSerializer(serializers.ModelSerializer):
         ]
 
     def get_start_page(self, obj):
+        # If the credit is anchored to a specific page, return its order
+        if obj.render:
+            return obj.render.order
+            
+        # Fallback to the first segment of the section
         first_segment = obj.issue_section.segments.order_by('start_page').first()
         return first_segment.start_page if first_segment else None
 
@@ -190,10 +195,16 @@ class CreditSerializer(serializers.ModelSerializer):
         queryset=Person.objects.all(),
         source='person'
     )
+    render_id = serializers.PrimaryKeyRelatedField(
+        queryset=RenderAsset.objects.all(),
+        source='render',
+        required=False,
+        allow_null=True
+    )
 
     class Meta:
         model = Credit
-        fields = ['id', 'person', 'person_id', 'role', 'importance']
+        fields = ['id', 'person', 'person_id', 'role', 'importance', 'render_id']
 
 class IssueSectionSerializer(serializers.ModelSerializer):
     section = SectionSerializer(read_only=True)
