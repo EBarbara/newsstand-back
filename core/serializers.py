@@ -150,6 +150,12 @@ class PersonCreditSerializer(serializers.ModelSerializer):
     section_title = serializers.CharField(source='issue_section.title', read_only=True)
     section_type = serializers.CharField(source='issue_section.section.name', read_only=True)
     start_page = serializers.SerializerMethodField()
+    render_ids = serializers.PrimaryKeyRelatedField(
+        queryset=RenderAsset.objects.all(),
+        source='renders',
+        many=True,
+        read_only=True
+    )
 
     class Meta:
         model = Credit
