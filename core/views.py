@@ -14,7 +14,7 @@ def get_recent_count():
 from PIL import Image
 from django.core.files.base import ContentFile
 from django.db import models, transaction
-from .models import Issue, Magazine, IssueSection, Section, RenderAsset, SectionSegment, Person
+from .models import Issue, Magazine, IssueSection, Section, RenderAsset, SectionSegment, Person, Credit
 from .serializers import (
     IssueListSerializer,
     IssueReaderSerializer,
@@ -24,6 +24,7 @@ from .serializers import (
     SectionSerializer,
     PersonSerializer,
     PersonDetailSerializer,
+    PersonCreditSerializer,
 )
 
 
@@ -316,3 +317,19 @@ class PersonViewSet(viewsets.ModelViewSet):
         if self.action in ['retrieve', 'update', 'partial_update']:
             return PersonDetailSerializer
         return PersonSerializer
+
+    @action(detail=True, methods=['get'])
+    def credits(self, request, pk=None):
+        person = self.get_object()
+        credits = Credit.objects.filter(person=person).select_related(
+            'issue_section__issue__magazine',
+            'issue_section__section'
+        ).order_by('-issue_section__issue__publishing_date')
+
+        page = self.paginate_queryset(credits)
+        if page is not None:
+            serializer = PersonCreditSerializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+
+        serializer = PersonCreditSerializer(credits, many=True, context={'request': request})
+        return Response(serializer.data)
