@@ -147,6 +147,7 @@ class PersonCreditSerializer(serializers.ModelSerializer):
     issue_cover = serializers.SerializerMethodField(method_name='get_cover_image')
     section_title = serializers.CharField(source='issue_section.title', read_only=True)
     section_type = serializers.CharField(source='issue_section.section.name', read_only=True)
+    start_page = serializers.SerializerMethodField()
 
     class Meta:
         model = Credit
@@ -160,8 +161,13 @@ class PersonCreditSerializer(serializers.ModelSerializer):
             'issue_id', 
             'issue_cover',
             'section_title', 
-            'section_type'
+            'section_type',
+            'start_page'
         ]
+
+    def get_start_page(self, obj):
+        first_segment = obj.issue_section.segments.order_by('start_page').first()
+        return first_segment.start_page if first_segment else None
 
     def get_cover_image(self, obj):
         try:
