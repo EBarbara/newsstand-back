@@ -91,20 +91,6 @@ class PersonDetailSerializer(serializers.ModelSerializer):
             except (json.JSONDecodeError, TypeError):
                 pass
         
-        # Handle aliases passed as a JSON string
-        aliases = data.get('aliases')
-        if isinstance(aliases, str):
-            try:
-                import json
-                parsed_aliases = json.loads(aliases)
-                if hasattr(data, 'setlist'):
-                    # For JSONField, we want the entire list/dict as a single value
-                    data.setlist('aliases', [parsed_aliases])
-                else:
-                    data['aliases'] = parsed_aliases
-            except (json.JSONDecodeError, TypeError):
-                pass
-        
         return super().to_internal_value(data)
 
     def get_credits(self, obj):
