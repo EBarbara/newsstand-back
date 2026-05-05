@@ -98,7 +98,8 @@ class PersonDetailSerializer(serializers.ModelSerializer):
                 import json
                 parsed_aliases = json.loads(aliases)
                 if hasattr(data, 'setlist'):
-                    data.setlist('aliases', parsed_aliases)
+                    # For JSONField, we want the entire list/dict as a single value
+                    data.setlist('aliases', [parsed_aliases])
                 else:
                     data['aliases'] = parsed_aliases
             except (json.JSONDecodeError, TypeError):
