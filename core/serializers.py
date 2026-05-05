@@ -181,8 +181,7 @@ class CreditSerializer(serializers.ModelSerializer):
     person = PersonSerializer(read_only=True)
     person_id = serializers.PrimaryKeyRelatedField(
         queryset=Person.objects.all(),
-        source='person',
-        write_only=True
+        source='person'
     )
 
     class Meta:
@@ -224,6 +223,14 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
             if seg['start_page'] > seg['end_page']:
                 raise serializers.ValidationError(
                     "start_page cannot be greater than end_page"
+                )
+        return value
+
+    def validate_credits(self, value):
+        for credit in value:
+            if 'person' not in credit:
+                raise serializers.ValidationError(
+                    "Cada crédito deve ter uma pessoa selecionada."
                 )
         return value
 
