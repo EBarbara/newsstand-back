@@ -155,6 +155,7 @@ class PersonCreditSerializer(serializers.ModelSerializer):
         many=True,
         read_only=True
     )
+    age_at_issue = serializers.SerializerMethodField()
 
     class Meta:
         model = Credit
@@ -170,7 +171,8 @@ class PersonCreditSerializer(serializers.ModelSerializer):
             'section_title', 
             'section_type',
             'start_page',
-            'render_ids'
+            'render_ids',
+            'age_at_issue'
         ]
 
     def get_start_page(self, obj):
@@ -182,6 +184,18 @@ class PersonCreditSerializer(serializers.ModelSerializer):
         # Fallback to the first segment of the section
         first_segment = obj.issue_section.segments.order_by('start_page').first()
         return first_segment.start_page if first_segment else None
+
+    def get_age_at_issue(self, obj):
+        person = obj.person
+        issue_date = obj.issue_section.issue.publishing_date
+        
+        if not person.birth_date or not issue_date:
+            return None
+            
+        age = issue_date.year - person.birth_date.year - (
+            (issue_date.month, issue_date.day) < (person.birth_date.month, person.birth_date.day)
+        )
+        return f"({age} anos)"
 
     def get_cover_image(self, obj):
         try:
@@ -210,10 +224,23 @@ class CreditSerializer(serializers.ModelSerializer):
         many=True,
         required=False
     )
+    age_at_issue = serializers.SerializerMethodField()
 
     class Meta:
         model = Credit
-        fields = ['id', 'person', 'person_id', 'role', 'importance', 'render_ids']
+        fields = ['id', 'person', 'person_id', 'role', 'importance', 'render_ids', 'age_at_issue']
+
+    def get_age_at_issue(self, obj):
+        person = obj.person
+        issue_date = obj.issue_section.issue.publishing_date
+        
+        if not person.birth_date or not issue_date:
+            return None
+            
+        age = issue_date.year - person.birth_date.year - (
+            (issue_date.month, issue_date.day) < (person.birth_date.month, person.birth_date.day)
+        )
+        return f"({age} anos)"
 
 class IssueSectionSerializer(serializers.ModelSerializer):
     section = SectionSerializer(read_only=True)
