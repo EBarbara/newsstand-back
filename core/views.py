@@ -310,7 +310,7 @@ class IssueSectionViewSet(viewsets.ModelViewSet):
 from django.db.models.functions import Collate
 
 class PersonViewSet(viewsets.ModelViewSet):
-    queryset = Person.objects.all().order_by(Collate('name', 'pt-BR'))
+    queryset = Person.objects.all().order_by(Collate('name', 'und-x-icu'))
     serializer_class = PersonSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name', 'aliases', 'disambiguation']
