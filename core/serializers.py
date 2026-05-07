@@ -5,7 +5,12 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework.request import Request
 
-from .models import Issue, IssueSection, Section, Person, Credit, Magazine, RenderAsset, SectionSegment, PersonLink
+from .models import Issue, IssueSection, Section, Person, Credit, Magazine, RenderAsset, SectionSegment, PersonLink, Tag
+
+class TagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = ['id', 'name', 'slug']
 
 class IssueCoverMixin:
     context: dict
@@ -41,9 +46,10 @@ class SectionSegmentSerializer(serializers.ModelSerializer):
         fields = ['start_page', 'end_page']
 
 class PersonSerializer(serializers.ModelSerializer):
+    tags = TagSerializer(many=True, read_only=True)
     class Meta:
         model = Person
-        fields = ['id', 'name', 'photo', 'photo_focus_x', 'photo_focus_y', 'aliases', 'disambiguation', 'birth_date', 'country']
+        fields = ['id', 'name', 'photo', 'photo_focus_x', 'photo_focus_y', 'aliases', 'disambiguation', 'birth_date', 'country', 'tags']
 
 class PersonLinkSerializer(serializers.ModelSerializer):
     class Meta:
@@ -69,7 +75,8 @@ class PersonDetailSerializer(serializers.ModelSerializer):
             'photo_focus_y',
             'aliases',
             'links', 
-            'credits'
+            'credits',
+            'tags'
         ]
 
     def to_internal_value(self, data):
@@ -334,9 +341,10 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
         return IssueSectionSerializer(instance, context=self.context).data
 
 class MagazineSerializer(serializers.ModelSerializer):
+    tags = TagSerializer(many=True, read_only=True)
     class Meta:
         model = Magazine
-        fields = ['name', 'slug']
+        fields = ['name', 'slug', 'tags']
 
 class IssueListSerializer(IssueCoverMixin, serializers.ModelSerializer):
     magazine = MagazineSerializer(read_only=True)

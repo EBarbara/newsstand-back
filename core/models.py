@@ -3,6 +3,15 @@ from django.db import models
 
 
 # Create your models here.
+class Tag(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    slug = models.SlugField(unique=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        ordering = ['name']
 
 class Magazine(models.Model):
     name = models.CharField(max_length=255)
@@ -11,6 +20,7 @@ class Magazine(models.Model):
     country = models.CharField(max_length=255, null=True, blank=True)
     slug = models.SlugField(unique=True, db_index=True)
     description = models.TextField(null=True, blank=True)
+    tags = models.ManyToManyField(Tag, blank=True, related_name='magazines')
 
     def __str__(self):
         return self.name
@@ -111,6 +121,7 @@ class Person(models.Model):
     photo_focus_x = models.IntegerField(default=50, verbose_name='Photo Focus X (%)')
     photo_focus_y = models.IntegerField(default=50, verbose_name='Photo Focus Y (%)')
     aliases = models.JSONField(default=list, blank=True, verbose_name='Aliases')
+    tags = models.ManyToManyField(Tag, blank=True, related_name='people')
 
     class Meta:
         verbose_name = 'Person'

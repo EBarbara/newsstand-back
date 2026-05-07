@@ -14,7 +14,7 @@ def get_recent_count():
 from PIL import Image
 from django.core.files.base import ContentFile
 from django.db import models, transaction
-from .models import Issue, Magazine, IssueSection, Section, RenderAsset, SectionSegment, Person, Credit
+from .models import Issue, Magazine, IssueSection, Section, RenderAsset, SectionSegment, Person, Credit, Tag
 from .serializers import (
     IssueListSerializer,
     IssueReaderSerializer,
@@ -25,6 +25,7 @@ from .serializers import (
     PersonSerializer,
     PersonDetailSerializer,
     PersonCreditSerializer,
+    TagSerializer,
 )
 
 
@@ -288,6 +289,17 @@ class MagazineViewSet(viewsets.ReadOnlyModelViewSet):
     lookup_field = 'slug'
     lookup_url_kwarg = 'magazine_slug'
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        tag_slug = self.request.query_params.get('tag')
+        if tag_slug:
+            qs = qs.filter(tags__slug=tag_slug)
+        return qs
+
+class TagViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Tag.objects.all()
+    serializer_class = TagSerializer
+
 class SectionViewSet(viewsets.ModelViewSet):
     queryset = Section.objects.all()
     serializer_class = SectionSerializer
@@ -315,6 +327,13 @@ class PersonViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name', 'aliases', 'disambiguation']
     ordering_fields = ['name', 'created_at']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        tag_slug = self.request.query_params.get('tag')
+        if tag_slug:
+            qs = qs.filter(tags__slug=tag_slug)
+        return qs
 
     def get_serializer_class(self):
         if self.action in ['retrieve', 'update', 'partial_update']:
