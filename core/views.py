@@ -307,8 +307,10 @@ class IssueSectionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(issue_id=self.kwargs['issue_pk'])
 
+from django.db.models.functions import Collate
+
 class PersonViewSet(viewsets.ModelViewSet):
-    queryset = Person.objects.all().order_by('name')
+    queryset = Person.objects.all().order_by(Collate('name', 'pt-BR'))
     serializer_class = PersonSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name', 'aliases', 'disambiguation']
