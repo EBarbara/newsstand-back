@@ -15,8 +15,8 @@ class MagazineAdmin(admin.ModelAdmin):
 
 @admin.register(Issue)
 class IssueAdmin(admin.ModelAdmin):
-    list_display = ('magazine', 'publishing_date', 'edition')
-    list_filter = ('magazine', 'publishing_date', 'tags')
+    list_display = ('magazine', 'publishing_date', 'edition', 'is_special')
+    list_filter = ('magazine', 'publishing_date', 'is_special', 'tags')
     filter_horizontal = ('tags',)
 
 @admin.register(Person)

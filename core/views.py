@@ -49,6 +49,11 @@ class IssueViewSet(viewsets.ModelViewSet):
         if exclude_tag:
             qs = qs.exclude(tags__slug=exclude_tag)
 
+        # Special Edition filtering
+        is_special = self.request.query_params.get('is_special')
+        if is_special is not None:
+            qs = qs.filter(is_special=is_special.lower() == 'true')
+
         # As identified in debug logs: 'magazine_magazine_slug'
         magazine_slug = self.kwargs.get('magazine_magazine_slug')
         
