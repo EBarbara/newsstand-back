@@ -60,6 +60,8 @@ class PersonDetailSerializer(serializers.ModelSerializer):
     links = PersonLinkSerializer(many=True, required=False)
     # We'll use a SerializerMethodField to get credits with issue info
     credits = serializers.SerializerMethodField()
+    tags = TagSerializer(many=True, read_only=True)
+    gender_display = serializers.CharField(source='get_gender_display', read_only=True)
 
     class Meta:
         model = Person
