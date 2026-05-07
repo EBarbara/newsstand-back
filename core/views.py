@@ -37,7 +37,17 @@ class IssueViewSet(viewsets.ModelViewSet):
 
         qs = qs.select_related('magazine')
         if self.action in ['list', 'recent']:
-            qs = qs.prefetch_related('renders')
+            qs = qs.prefetch_related('renders', 'tags')
+
+        # Tag filtering
+        tag_slug = self.request.query_params.get('tag')
+        if tag_slug:
+            qs = qs.filter(tags__slug=tag_slug)
+        
+        # Tag exclusion (for "filter out" special editions)
+        exclude_tag = self.request.query_params.get('exclude_tag')
+        if exclude_tag:
+            qs = qs.exclude(tags__slug=exclude_tag)
 
         # As identified in debug logs: 'magazine_magazine_slug'
         magazine_slug = self.kwargs.get('magazine_magazine_slug')
@@ -49,6 +59,7 @@ class IssueViewSet(viewsets.ModelViewSet):
             qs = qs.prefetch_related(
                 'issue_sections__section',
                 'issue_sections__segments',
+                'tags'
             )
 
         return qs

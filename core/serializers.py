@@ -352,7 +352,7 @@ class IssueListSerializer(IssueCoverMixin, serializers.ModelSerializer):
 
     class Meta:
         model = Issue
-        fields = ['id', 'publishing_date', 'edition', 'magazine', 'cover', 'has_physical_copy', 'is_digital_complete']
+        fields = ['id', 'publishing_date', 'edition', 'magazine', 'cover', 'has_physical_copy', 'is_digital_complete', 'tags']
 
 class IssueReaderSerializer(IssueCoverMixin, serializers.ModelSerializer):
     magazine = MagazineSerializer(read_only=True)
@@ -372,4 +372,5 @@ class IssueReaderSerializer(IssueCoverMixin, serializers.ModelSerializer):
             'sections',
             'has_physical_copy',
             'is_digital_complete',
+            'tags',
         ]

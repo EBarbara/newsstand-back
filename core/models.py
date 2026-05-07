@@ -34,6 +34,7 @@ class Issue(models.Model):
     source_file = models.CharField(max_length=1000, null=True, blank=True)
     has_physical_copy = models.BooleanField(default=False, verbose_name='Has Physical Copy')
     is_digital_complete = models.BooleanField(default=False, verbose_name='Is Digital Complete')
+    tags = models.ManyToManyField(Tag, blank=True, related_name='issues')
 
     class Meta:
         verbose_name = 'Issue'
