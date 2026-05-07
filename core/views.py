@@ -5,6 +5,8 @@ from rest_framework.response import Response
 from decouple import config
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework import status
+from django_filters import rest_framework as django_filters
+from django_filters.rest_framework import FilterSet, CharFilter, DateFilter, ChoiceFilter
 
 from core.services import process_cbz_file
 
@@ -337,19 +339,24 @@ class IssueSectionViewSet(viewsets.ModelViewSet):
 
 from django.db.models.functions import Collate
 
+class PersonFilter(FilterSet):
+    name = CharFilter(lookup_expr='icontains')
+    birth_date_after = DateFilter(field_name='birth_date', lookup_expr='gte')
+    birth_date_before = DateFilter(field_name='birth_date', lookup_expr='lte')
+    tag = CharFilter(field_name='tags__slug', lookup_expr='exact')
+    gender = ChoiceFilter(choices=Person.GENDER_CHOICES)
+    
+    class Meta:
+        model = Person
+        fields = ['gender', 'country']
+
 class PersonViewSet(viewsets.ModelViewSet):
     queryset = Person.objects.all().order_by(Collate('name', 'und-x-icu'))
     serializer_class = PersonSerializer
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [django_filters.DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_class = PersonFilter
     search_fields = ['name', 'aliases', 'disambiguation']
-    ordering_fields = ['name', 'created_at']
-
-    def get_queryset(self):
-        qs = super().get_queryset()
-        tag_slug = self.request.query_params.get('tag')
-        if tag_slug:
-            qs = qs.filter(tags__slug=tag_slug)
-        return qs
+    ordering_fields = ['name', 'created_at', 'birth_date', 'country']
 
     def get_serializer_class(self):
         if self.action in ['retrieve', 'update', 'partial_update']:

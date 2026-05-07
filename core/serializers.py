@@ -46,10 +46,10 @@ class SectionSegmentSerializer(serializers.ModelSerializer):
         fields = ['start_page', 'end_page']
 
 class PersonSerializer(serializers.ModelSerializer):
-    tags = TagSerializer(many=True, read_only=True)
+    gender_display = serializers.CharField(source='get_gender_display', read_only=True)
     class Meta:
         model = Person
-        fields = ['id', 'name', 'photo', 'photo_focus_x', 'photo_focus_y', 'aliases', 'disambiguation', 'birth_date', 'country', 'tags']
+        fields = ['id', 'name', 'photo', 'photo_focus_x', 'photo_focus_y', 'aliases', 'disambiguation', 'birth_date', 'country', 'tags', 'gender', 'gender_display']
 
 class PersonLinkSerializer(serializers.ModelSerializer):
     class Meta:
@@ -76,7 +76,9 @@ class PersonDetailSerializer(serializers.ModelSerializer):
             'aliases',
             'links', 
             'credits',
-            'tags'
+            'tags',
+            'gender',
+            'gender_display'
         ]
 
     def to_internal_value(self, data):

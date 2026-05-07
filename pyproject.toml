@@ -13,4 +13,5 @@ dependencies = [
     "pydantic>=2.13.2",
     "python-decouple>=3.8",
     "psycopg[binary]>=3.2.4",
+    "django-filter>=25.1",
 ]

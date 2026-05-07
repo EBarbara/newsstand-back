@@ -125,6 +125,23 @@ class Person(models.Model):
     aliases = models.JSONField(default=list, blank=True, verbose_name='Aliases')
     tags = models.ManyToManyField(Tag, blank=True, related_name='people')
 
+    GENDER_CHOICES = [
+        (None, 'Não informado'),
+        ('M', 'Masculino'),
+        ('F', 'Feminino'),
+        ('TM', 'Transsexual Masculino'),
+        ('TF', 'Transsexual Feminino'),
+        ('I', 'Intersexual'),
+        ('NB', 'Não-binário'),
+    ]
+    gender = models.CharField(
+        max_length=2, 
+        choices=GENDER_CHOICES, 
+        null=True, 
+        blank=True, 
+        verbose_name='Gênero'
+    )
+
     class Meta:
         verbose_name = 'Person'
         verbose_name_plural = 'People'
