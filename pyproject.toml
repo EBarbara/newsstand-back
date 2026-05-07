@@ -12,4 +12,5 @@ dependencies = [
     "Pillow>=12.1.1",
     "pydantic>=2.13.2",
     "python-decouple>=3.8",
+    "psycopg[binary]>=3.2.4",
 ]
