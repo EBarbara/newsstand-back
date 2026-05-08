@@ -341,10 +341,14 @@ from django.db.models.functions import Collate
 
 class PersonFilter(FilterSet):
     name = CharFilter(lookup_expr='icontains')
+    name_exclude = CharFilter(field_name='name', lookup_expr='icontains', exclude=True)
     birth_date_after = DateFilter(field_name='birth_date', lookup_expr='gte')
     birth_date_before = DateFilter(field_name='birth_date', lookup_expr='lte')
     tag = CharFilter(field_name='tags__slug', lookup_expr='exact')
+    tag_exclude = CharFilter(field_name='tags__slug', lookup_expr='exact', exclude=True)
     gender = ChoiceFilter(choices=Person.GENDER_CHOICES)
+    gender_exclude = ChoiceFilter(field_name='gender', choices=Person.GENDER_CHOICES, exclude=True)
+    country_exclude = CharFilter(field_name='country', lookup_expr='exact', exclude=True)
     
     class Meta:
         model = Person
