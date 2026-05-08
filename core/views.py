@@ -243,6 +243,21 @@ class IssueViewSet(viewsets.ModelViewSet):
 
         return Response(IssueReaderSerializer(issue, context={'request': request}).data)
 
+    @action(detail=True, methods=['patch'], url_path='update-page/(?P<render_pk>[^/.]+)')
+    def update_page(self, request, render_pk=None, *args, **kwargs):
+        issue = self.get_object()
+        try:
+            render = issue.renders.get(pk=render_pk)
+        except Render.DoesNotExist:
+            return Response({"error": "Page not found"}, status=404)
+            
+        from .serializers import RenderSerializer
+        serializer = RenderSerializer(render, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+
     @action(detail=True, methods=['post'], url_path='replace-page/(?P<render_pk>[^/.]+)')
     def replace_page(self, request, render_pk=None, *args, **kwargs):
         issue = self.get_object()
