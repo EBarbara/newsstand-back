@@ -201,7 +201,14 @@ class PersonCreditSerializer(serializers.ModelSerializer):
         person = obj.person
         issue_date = obj.issue_section.issue.publishing_date
         
-        if not person.birth_date or not issue_date:
+        if not issue_date:
+            return None
+
+        # Check if posthumous
+        if person.death_date and person.death_date <= issue_date:
+            return "póstumo"
+            
+        if not person.birth_date:
             return None
             
         age = issue_date.year - person.birth_date.year - (
