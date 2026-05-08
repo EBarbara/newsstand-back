@@ -63,7 +63,7 @@ class Render(models.Model):
     order = models.IntegerField()
     is_cover = models.BooleanField(default=False)
     page_type = models.CharField(max_length=10, choices=PAGE_TYPES, default='NORMAL')
-    focus_x = models.IntegerField(default=50) # % from left
+    focus_x = models.IntegerField(default=0) # % from left
     focus_y = models.IntegerField(default=50) # % from top
     width = models.IntegerField()
     height = models.IntegerField()

@@ -18,12 +18,16 @@ class IssueCoverMixin:
     def get_cover(self, obj):
         request: Request | None = self.context.get("request")
 
-        first: Optional[Render] = obj.renders.first()
+        # Prioritize renders marked as covers
+        cover = obj.renders.filter(is_cover=True).first()
+        # Fallback to the first render by order
+        if not cover:
+            cover = obj.renders.first()
 
-        if first is None:
+        if cover is None:
             return None
 
-        url = first.image.url
+        url = cover.image.url
 
         if request is not None:
             return request.build_absolute_uri(url)
@@ -219,9 +223,12 @@ class PersonCreditSerializer(serializers.ModelSerializer):
     def get_cover_image(self, obj):
         try:
             issue = obj.issue_section.issue
-            # Try to find the first page (order 0)
-            cover = issue.renders.filter(order=0).first()
-            # Fallback to the first render available if order 0 is missing
+            # Prioritize renders marked as covers
+            cover = issue.renders.filter(is_cover=True).first()
+            # Fallback to order 0
+            if not cover:
+                cover = issue.renders.filter(order=0).first()
+            # Ultimate fallback to any render
             if not cover:
                 cover = issue.renders.all().first()
             
