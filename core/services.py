@@ -9,7 +9,7 @@ from PIL import Image
 from django.core.files.base import ContentFile
 from django.utils.text import slugify
 
-from core.models import Issue, RenderAsset, Magazine
+from core.models import Issue, Render, Magazine
 
 VALID_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.webp')
 
@@ -161,7 +161,7 @@ def process_cbz_file(
                 log(f"AVISO: Erro ao ler imagem: {img_filename}")
                 continue
 
-            render = RenderAsset.objects.create(
+            render = Render.objects.create(
                 issue=issue,
                 order=i,
                 width=width,

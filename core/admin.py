@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Magazine, Issue, RenderAsset, Page, Section, IssueSection, SectionSegment, Person, PersonLink, Credit, Tag
+from .models import Magazine, Issue, Render, Page, Section, IssueSection, SectionSegment, Person, PersonLink, Credit, Tag
 
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
@@ -30,4 +30,4 @@ admin.site.register(Section)
 admin.site.register(IssueSection)
 admin.site.register(Credit)
 admin.site.register(PersonLink)
-admin.site.register(RenderAsset)
+admin.site.register(Render)

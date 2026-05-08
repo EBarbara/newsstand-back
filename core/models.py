@@ -51,15 +51,23 @@ class Issue(models.Model):
         return f"{self.publishing_date.strftime('%b/%y')}{edition_str}"
 
 
-class RenderAsset(models.Model):
+class Render(models.Model):
+    PAGE_TYPES = [
+        ('NORMAL', 'Normal'),
+        ('SPREAD', 'Página Dupla'),
+        ('GATEFOLD', 'Desdobrável'),
+    ]
+
     issue = models.ForeignKey(Issue, on_delete=models.CASCADE, related_name='renders')
-
-    order = models.IntegerField()  # navegação
-
-    image = models.ImageField(upload_to='pages/')
-
+    image = models.ImageField(upload_to='renders/')
+    order = models.IntegerField()
+    is_cover = models.BooleanField(default=False)
+    page_type = models.CharField(max_length=10, choices=PAGE_TYPES, default='NORMAL')
+    focus_x = models.IntegerField(default=50) # % from left
+    focus_y = models.IntegerField(default=50) # % from top
     width = models.IntegerField()
     height = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['order']
@@ -73,7 +81,7 @@ class Page(models.Model):
 
     number = models.IntegerField()
 
-    render = models.ForeignKey(RenderAsset, on_delete=models.SET_NULL, null=True)
+    render = models.ForeignKey(Render, on_delete=models.SET_NULL, null=True)
 
     class Meta:
         ordering = ['number']
@@ -185,7 +193,7 @@ class Credit(models.Model):
     role = models.CharField(max_length=255, null=True, blank=True, verbose_name='Role')
     importance = models.IntegerField(choices=IMPORTANCE_CHOICES, default=2, verbose_name='Importance')
     renders = models.ManyToManyField(
-        'RenderAsset', 
+        Render, 
         blank=True, 
         related_name='credits', 
         verbose_name='Specific Pages'

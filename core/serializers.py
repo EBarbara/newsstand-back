@@ -5,7 +5,7 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework.request import Request
 
-from .models import Issue, IssueSection, Section, Person, Credit, Magazine, RenderAsset, SectionSegment, PersonLink, Tag
+from .models import Issue, IssueSection, Section, Person, Credit, Magazine, Render, SectionSegment, PersonLink, Tag
 
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
@@ -18,7 +18,7 @@ class IssueCoverMixin:
     def get_cover(self, obj):
         request: Request | None = self.context.get("request")
 
-        first: Optional[RenderAsset] = obj.renders.first()
+        first: Optional[Render] = obj.renders.first()
 
         if first is None:
             return None
@@ -32,8 +32,8 @@ class IssueCoverMixin:
 
 class RenderSerializer(serializers.ModelSerializer):
     class Meta:
-        model = RenderAsset
-        fields = ['id', 'order', 'image']
+        model = Render
+        fields = ['id', 'order', 'image', 'is_cover', 'page_type', 'focus_x', 'focus_y', 'width', 'height']
 
 class SectionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -238,7 +238,7 @@ class CreditSerializer(serializers.ModelSerializer):
         source='person'
     )
     render_ids = serializers.PrimaryKeyRelatedField(
-        queryset=RenderAsset.objects.all(),
+        queryset=Render.objects.all(),
         source='renders',
         many=True,
         required=False

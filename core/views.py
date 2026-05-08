@@ -16,7 +16,7 @@ def get_recent_count():
 from PIL import Image
 from django.core.files.base import ContentFile
 from django.db import models, transaction
-from .models import Issue, Magazine, IssueSection, Section, RenderAsset, SectionSegment, Person, Credit, Tag
+from .models import Issue, Magazine, IssueSection, Section, Render, SectionSegment, Person, Credit, Tag
 from .serializers import (
     IssueListSerializer,
     IssueReaderSerializer,
@@ -233,7 +233,7 @@ class IssueViewSet(viewsets.ModelViewSet):
             img = Image.open(file)
             width, height = img.size
             
-            render = RenderAsset.objects.create(
+            render = Render.objects.create(
                 issue=issue,
                 order=order,
                 width=width,
@@ -250,7 +250,7 @@ class IssueViewSet(viewsets.ModelViewSet):
         
         try:
             render = issue.renders.get(pk=render_pk)
-        except RenderAsset.DoesNotExist:
+        except Render.DoesNotExist:
             return Response({"error": "Page not found"}, status=404)
 
         if not file:
@@ -269,7 +269,7 @@ class IssueViewSet(viewsets.ModelViewSet):
         
         try:
             render = issue.renders.get(pk=render_pk)
-        except RenderAsset.DoesNotExist:
+        except Render.DoesNotExist:
             return Response({"error": "Page not found"}, status=404)
 
         order = render.order
