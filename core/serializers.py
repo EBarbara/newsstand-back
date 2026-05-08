@@ -49,7 +49,7 @@ class PersonSerializer(serializers.ModelSerializer):
     gender_display = serializers.CharField(source='get_gender_display', read_only=True)
     class Meta:
         model = Person
-        fields = ['id', 'name', 'photo', 'photo_focus_x', 'photo_focus_y', 'aliases', 'disambiguation', 'birth_date', 'country', 'tags', 'gender', 'gender_display']
+        fields = ['id', 'name', 'photo', 'photo_focus_x', 'photo_focus_y', 'aliases', 'disambiguation', 'birth_date', 'death_date', 'country', 'tags', 'gender', 'gender_display']
 
 class PersonLinkSerializer(serializers.ModelSerializer):
     class Meta:
@@ -70,6 +70,7 @@ class PersonDetailSerializer(serializers.ModelSerializer):
             'name', 
             'disambiguation',
             'birth_date', 
+            'death_date',
             'country', 
             'biography', 
             'photo', 

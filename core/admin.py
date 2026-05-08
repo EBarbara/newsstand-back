@@ -21,7 +21,7 @@ class IssueAdmin(admin.ModelAdmin):
 
 @admin.register(Person)
 class PersonAdmin(admin.ModelAdmin):
-    list_display = ('name', 'gender', 'country', 'birth_date')
+    list_display = ('name', 'gender', 'country', 'birth_date', 'death_date')
     search_fields = ('name', 'aliases')
     list_filter = ('gender', 'country', 'tags')
     filter_horizontal = ('tags',)

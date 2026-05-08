@@ -117,6 +117,7 @@ class Person(models.Model):
     name = models.CharField(max_length=255, verbose_name='Name')
     disambiguation = models.CharField(max_length=255, null=True, blank=True, verbose_name='Disambiguation')
     birth_date = models.DateField(null=True, blank=True, verbose_name='Birth Date')
+    death_date = models.DateField(null=True, blank=True, verbose_name='Death Date')
     country = models.CharField(max_length=255, null=True, blank=True, verbose_name='Country')
     biography = models.TextField(null=True, blank=True, verbose_name='Biography')
     photo = models.ImageField(upload_to='people/', null=True, blank=True, verbose_name='Photo')
