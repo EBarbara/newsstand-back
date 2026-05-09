@@ -192,6 +192,8 @@ class PersonCreditSerializer(serializers.ModelSerializer):
             'issue_edition', 
             'issue_id', 
             'issue_cover',
+            'issue_cover_focus_x',
+            'issue_cover_focus_y',
             'section_title', 
             'section_type',
             'start_page',
