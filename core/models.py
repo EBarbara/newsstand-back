@@ -1,5 +1,8 @@
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
+import os
 
 
 # Create your models here.
@@ -208,3 +211,18 @@ class Credit(models.Model):
         role_text = f' as {self.role}' if self.role else ''
         importance_text = f' [{self.get_importance_display()}]'
         return f"{self.person}{role_text}{importance_text} in {self.issue_section}"
+
+
+@receiver(post_delete, sender=Render)
+def delete_render_image(sender, instance, **kwargs):
+    """Deletes image file from filesystem when Render object is deleted."""
+    if instance.image:
+        if os.path.isfile(instance.image.path):
+            os.remove(instance.image.path)
+
+@receiver(post_delete, sender=Person)
+def delete_person_photo(sender, instance, **kwargs):
+    """Deletes photo file from filesystem when Person object is deleted."""
+    if instance.photo:
+        if os.path.isfile(instance.photo.path):
+            os.remove(instance.photo.path)
