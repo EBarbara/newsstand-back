@@ -249,14 +249,33 @@ class IssueViewSet(viewsets.ModelViewSet):
         try:
             render = issue.renders.get(pk=render_pk)
         except Render.DoesNotExist:
-            return Response({"error": "Page not found"}, status=404)
-            
+            return Response({"error": "Render not found"}, status=404)
+
         from .serializers import RenderSerializer
         serializer = RenderSerializer(render, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
+
+    @action(detail=True, methods=['post'], url_path='reorder-pages')
+    def reorder_pages(self, request, *args, **kwargs):
+        issue = self.get_object()
+        render_ids = request.data.get('render_ids', [])
+
+        if not render_ids:
+            return Response({"error": "No render_ids provided"}, status=400)
+
+        with transaction.atomic():
+            # First pass: set to temporary negative values to avoid collisions
+            for i, r_id in enumerate(render_ids):
+                Render.objects.filter(id=r_id, issue=issue).update(order=-(i + 1))
+            
+            # Second pass: set to final positive values
+            for i, r_id in enumerate(render_ids):
+                Render.objects.filter(id=r_id, issue=issue).update(order=i)
+
+        return Response(IssueReaderSerializer(issue, context={'request': request}).data)
 
     @action(detail=True, methods=['post'], url_path='replace-page/(?P<render_pk>[^/.]+)')
     def replace_page(self, request, render_pk=None, *args, **kwargs):
