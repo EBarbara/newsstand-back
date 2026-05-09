@@ -17,22 +17,28 @@ class IssueCoverMixin:
 
     def get_cover(self, obj):
         request: Request | None = self.context.get("request")
+        cover = self._get_cover_render(obj)
+        if cover is None: return None
+        url = cover.image.url
+        if request is not None:
+            return request.build_absolute_uri(url)
+        return url
 
+    def _get_cover_render(self, obj) -> Optional[Render]:
         # Prioritize renders marked as covers
         cover = obj.renders.filter(is_cover=True).first()
         # Fallback to the first render by order
         if not cover:
             cover = obj.renders.first()
+        return cover
 
-        if cover is None:
-            return None
+    def get_cover_focus_x(self, obj):
+        cover = self._get_cover_render(obj)
+        return cover.focus_x if cover else 0
 
-        url = cover.image.url
-
-        if request is not None:
-            return request.build_absolute_uri(url)
-
-        return url
+    def get_cover_focus_y(self, obj):
+        cover = self._get_cover_render(obj)
+        return cover.focus_y if cover else 50
 
 class RenderSerializer(serializers.ModelSerializer):
     class Meta:
@@ -163,6 +169,8 @@ class PersonCreditSerializer(serializers.ModelSerializer):
     issue_edition = serializers.CharField(source='issue_section.issue.edition', read_only=True)
     issue_id = serializers.IntegerField(source='issue_section.issue.id', read_only=True)
     issue_cover = serializers.SerializerMethodField(method_name='get_cover_image')
+    issue_cover_focus_x = serializers.SerializerMethodField()
+    issue_cover_focus_y = serializers.SerializerMethodField()
     section_title = serializers.CharField(source='issue_section.title', read_only=True)
     section_type = serializers.CharField(source='issue_section.section.name', read_only=True)
     start_page = serializers.SerializerMethodField()
@@ -220,23 +228,34 @@ class PersonCreditSerializer(serializers.ModelSerializer):
         )
         return f"({age} anos)"
 
+    def _get_cover_render(self, obj) -> Optional[Render]:
+        issue = obj.issue_section.issue
+        # Prioritize renders marked as covers
+        cover = issue.renders.filter(is_cover=True).first()
+        # Fallback to order 0
+        if not cover:
+            cover = issue.renders.filter(order=0).first()
+        # Ultimate fallback to any render
+        if not cover:
+            cover = issue.renders.all().first()
+        return cover
+
     def get_cover_image(self, obj):
         try:
-            issue = obj.issue_section.issue
-            # Prioritize renders marked as covers
-            cover = issue.renders.filter(is_cover=True).first()
-            # Fallback to order 0
-            if not cover:
-                cover = issue.renders.filter(order=0).first()
-            # Ultimate fallback to any render
-            if not cover:
-                cover = issue.renders.all().first()
-            
+            cover = self._get_cover_render(obj)
             if cover and cover.image:
                 return cover.image.url
         except Exception:
             pass
         return None
+
+    def get_issue_cover_focus_x(self, obj):
+        cover = self._get_cover_render(obj)
+        return cover.focus_x if cover else 0
+
+    def get_issue_cover_focus_y(self, obj):
+        cover = self._get_cover_render(obj)
+        return cover.focus_y if cover else 50
 
 class CreditSerializer(serializers.ModelSerializer):
     person = PersonSerializer(read_only=True)
@@ -368,10 +387,12 @@ class MagazineSerializer(serializers.ModelSerializer):
 class IssueListSerializer(IssueCoverMixin, serializers.ModelSerializer):
     magazine = MagazineSerializer(read_only=True)
     cover = serializers.SerializerMethodField()
+    cover_focus_x = serializers.SerializerMethodField()
+    cover_focus_y = serializers.SerializerMethodField()
 
     class Meta:
         model = Issue
-        fields = ['id', 'publishing_date', 'edition', 'magazine', 'cover', 'has_physical_copy', 'is_digital_complete', 'is_special', 'tags']
+        fields = ['id', 'publishing_date', 'edition', 'magazine', 'cover', 'cover_focus_x', 'cover_focus_y', 'has_physical_copy', 'is_digital_complete', 'is_special', 'tags']
 
 class IssueReaderSerializer(IssueCoverMixin, serializers.ModelSerializer):
     magazine = MagazineSerializer(read_only=True)
@@ -387,6 +408,8 @@ class IssueReaderSerializer(IssueCoverMixin, serializers.ModelSerializer):
             'edition',
             'magazine',
             'cover',
+            'cover_focus_x',
+            'cover_focus_y',
             'renders',
             'sections',
             'has_physical_copy',
