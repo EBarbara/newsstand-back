@@ -401,6 +401,8 @@ class IssueReaderSerializer(IssueCoverMixin, serializers.ModelSerializer):
     renders = RenderSerializer(many=True, read_only=True)
     sections = IssueSectionSerializer(source='issue_sections', many=True, read_only=True)
     cover = serializers.SerializerMethodField()
+    cover_focus_x = serializers.SerializerMethodField()
+    cover_focus_y = serializers.SerializerMethodField()
 
     class Meta:
         model = Issue
