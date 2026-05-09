@@ -271,9 +271,9 @@ class IssueViewSet(viewsets.ModelViewSet):
             for i, r_id in enumerate(render_ids):
                 Render.objects.filter(id=r_id, issue=issue).update(order=-(i + 1))
             
-            # Second pass: set to final positive values
+            # Second pass: set to final positive values (1-based indexing)
             for i, r_id in enumerate(render_ids):
-                Render.objects.filter(id=r_id, issue=issue).update(order=i)
+                Render.objects.filter(id=r_id, issue=issue).update(order=i + 1)
 
         return Response(IssueReaderSerializer(issue, context={'request': request}).data)
 
