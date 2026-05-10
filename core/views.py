@@ -140,8 +140,8 @@ class IssueViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(issue)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    @action(detail=True, methods=['post'], parser_classes=[MultiPartParser, FormParser])
-    def import_cbz(self, request, *args, **kwargs):
+    @action(detail=True, methods=['post'], parser_classes=[MultiPartParser, FormParser], url_path='import_cbz')
+    def import_cbz_to_issue(self, request, *args, **kwargs):
         issue = self.get_object()
         file_obj = request.FILES.get('file')
         if not file_obj:
