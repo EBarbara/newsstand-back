@@ -179,6 +179,7 @@ class PersonCreditSerializer(serializers.ModelSerializer):
         many=True,
         read_only=True
     )
+    issue_date = serializers.DateField(source='issue_section.issue.publishing_date', read_only=True)
     age_at_issue = serializers.SerializerMethodField()
 
     class Meta:
@@ -190,6 +191,7 @@ class PersonCreditSerializer(serializers.ModelSerializer):
             'magazine_name', 
             'magazine_slug', 
             'issue_edition', 
+            'issue_date',
             'issue_id', 
             'issue_cover',
             'issue_cover_focus_x',
