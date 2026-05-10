@@ -82,7 +82,8 @@ def process_cbz_file(
     edition: Optional[str] = None,
     publishing_date: Optional[date | str] = None,
     logger: Optional[Callable[[str], None]] = None,
-    issue: Optional[Issue] = None
+    issue: Optional[Issue] = None,
+    append: bool = False
 ) -> Issue:
     """
     Processa um arquivo CBZ (file_obj) e importa suas imagens para um Issue.
@@ -143,8 +144,14 @@ def process_cbz_file(
 
     log(f"Importando CBZ para Issue {issue.id} ({issue})...")
 
-    # ⚠️ limpar renders antigos
-    issue.renders.all().delete()
+    start_order = 1
+    if not append:
+        # ⚠️ limpar renders antigos
+        issue.renders.all().delete()
+    else:
+        from django.db.models import Max
+        max_order = issue.renders.aggregate(Max('order'))['order__max'] or 0
+        start_order = max_order + 1
 
     with zipfile.ZipFile(file_obj) as zf:
         files = [f for f in zf.namelist() if is_image(f)]
@@ -152,7 +159,7 @@ def process_cbz_file(
 
         log(f"{len(files)} imagens encontradas")
 
-        for i, img_filename in enumerate(files, start=1):
+        for i, img_filename in enumerate(files, start=start_order):
             data = zf.read(img_filename)
             try:
                 image = Image.open(io.BytesIO(data))

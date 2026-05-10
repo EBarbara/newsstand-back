@@ -140,6 +140,28 @@ class IssueViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(issue)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    @action(detail=True, methods=['post'], parser_classes=[MultiPartParser, FormParser])
+    def import_cbz(self, request, *args, **kwargs):
+        issue = self.get_object()
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({"error": "No file provided. Field must be named 'file'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            issue = process_cbz_file(
+                file_obj=file_obj,
+                filename=file_obj.name,
+                issue=issue,
+                append=True
+            )
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": f"Failed to process CBZ: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        serializer = self.get_serializer(issue)
+        return Response(serializer.data)
+
     @action(detail=False, methods=['post'], parser_classes=[JSONParser])
     def create_empty(self, request, *args, **kwargs):
         magazine_slug = request.data.get('magazine')
