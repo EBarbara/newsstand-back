@@ -84,7 +84,7 @@ def process_cbz_file(
     logger: Optional[Callable[[str], None]] = None,
     issue: Optional[Issue] = None,
     append: bool = False
-) -> Issue:
+) -> tuple[Issue, int]:
     """
     Processa um arquivo CBZ (file_obj) e importa suas imagens para um Issue.
     :param file_obj: Pode ser um objeto de arquivo aberto (open(path, 'rb')) ou um UploadedFile do Django.
@@ -188,5 +188,6 @@ def process_cbz_file(
             if i % 10 == 0:
                 log(f"{i} páginas importadas...")
 
-    log("Importação concluída!")
-    return issue
+    imported_count = len(files)
+    log(f"Importação concluída! {imported_count} páginas processadas.")
+    return issue, imported_count
