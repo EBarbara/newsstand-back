@@ -383,6 +383,7 @@ class TagViewSet(viewsets.ReadOnlyModelViewSet):
 class SectionViewSet(viewsets.ModelViewSet):
     queryset = Section.objects.all()
     serializer_class = SectionSerializer
+    pagination_class = None
 
 class IssueSectionViewSet(viewsets.ModelViewSet):
 
