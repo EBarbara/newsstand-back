@@ -5,7 +5,7 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework.request import Request
 
-from .models import Issue, IssueSection, Section, Person, Credit, Magazine, Render, SectionSegment, PersonLink, Tag
+from .models import Issue, IssueSection, Section, Person, Credit, Magazine, Render, SectionSegment, PersonLink, Tag, PersonRelationship
 
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
@@ -66,10 +66,23 @@ class PersonLinkSerializer(serializers.ModelSerializer):
         model = PersonLink
         fields = ['id', 'url', 'label']
 
+class PersonRelationshipSerializer(serializers.ModelSerializer):
+    # This is a flat representation for the frontend
+    person_id = serializers.IntegerField()
+    person_name = serializers.CharField(read_only=True)
+    label = serializers.CharField()
+    inverse_label = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    is_from = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = PersonRelationship
+        fields = ['id', 'person_id', 'person_name', 'label', 'inverse_label', 'is_from', 'order']
+
 class PersonDetailSerializer(serializers.ModelSerializer):
     links = PersonLinkSerializer(many=True, required=False)
     # We'll use a SerializerMethodField to get credits with issue info
     credits = serializers.SerializerMethodField()
+    relationships = serializers.SerializerMethodField()
     tags = TagSerializer(many=True, read_only=True)
     gender_display = serializers.CharField(source='get_gender_display', read_only=True)
 
@@ -89,6 +102,7 @@ class PersonDetailSerializer(serializers.ModelSerializer):
             'aliases',
             'links', 
             'credits',
+            'relationships',
             'tags',
             'gender',
             'gender_display'
@@ -113,6 +127,19 @@ class PersonDetailSerializer(serializers.ModelSerializer):
             except (json.JSONDecodeError, TypeError):
                 pass
         
+        # Handle relationships passed as a JSON string
+        relationships = data.get('relationships')
+        if isinstance(relationships, str):
+            try:
+                import json
+                parsed_rels = json.loads(relationships)
+                if hasattr(data, 'setlist'):
+                    data.setlist('relationships', parsed_rels)
+                else:
+                    data['relationships'] = parsed_rels
+            except (json.JSONDecodeError, TypeError):
+                pass
+        
         return super().to_internal_value(data)
 
     def get_credits(self, obj):
@@ -121,6 +148,33 @@ class PersonDetailSerializer(serializers.ModelSerializer):
             'issue_section__section'
         )
         return PersonCreditSerializer(credits, many=True, context=self.context).data
+
+    def get_relationships(self, obj):
+        rels = []
+        # Relationships where obj is from_person
+        for r in obj.relationships_from.all().select_related('to_person'):
+            rels.append({
+                'id': r.id,
+                'person_id': r.to_person.id,
+                'person_name': r.to_person.name,
+                'label': r.label,
+                'inverse_label': r.inverse_label,
+                'is_from': True,
+                'order': r.order
+            })
+        # Relationships where obj is to_person
+        for r in obj.relationships_to.all().select_related('from_person'):
+            if r.inverse_label:
+                rels.append({
+                    'id': r.id,
+                    'person_id': r.from_person.id,
+                    'person_name': r.from_person.name,
+                    'label': r.inverse_label,
+                    'inverse_label': r.label,
+                    'is_from': False,
+                    'order': r.order
+                })
+        return sorted(rels, key=lambda x: (x['order'], x['id']))
 
     @transaction.atomic
     def update(self, instance, validated_data):
@@ -139,6 +193,19 @@ class PersonDetailSerializer(serializers.ModelSerializer):
                     pass
             elif isinstance(links_raw, list):
                 links_data = links_raw
+
+        # Pop relationships_data
+        relationships_data = validated_data.pop('relationships', None)
+        if relationships_data is None and 'relationships' in self.initial_data:
+            rels_raw = self.initial_data.get('relationships')
+            if isinstance(rels_raw, str):
+                try:
+                    import json
+                    relationships_data = json.loads(rels_raw)
+                except:
+                    pass
+            elif isinstance(rels_raw, list):
+                relationships_data = rels_raw
 
         # Update main instance fields
         for attr, value in validated_data.items():
@@ -160,6 +227,40 @@ class PersonDetailSerializer(serializers.ModelSerializer):
                             url=url, 
                             label=label
                         )
+        
+        # Perform relationships update
+        if relationships_data is not None:
+            # This is tricky because we only want to delete/update records where THIS person is 'from_person'
+            # OR where they are 'to_person' but the record belongs to the relationship list.
+            
+            # Simple approach for now: delete all relationships where this person is 'from_person'
+            # and recreate them. 
+            # Note: Relationships where this person is 'to_person' are managed by the other person's profile,
+            # BUT the user might want to edit them here.
+            
+            # To keep it simple and avoid complex logic, we'll only allow editing relationships
+            # where the current person is 'from_person'.
+            
+            instance.relationships_from.all().delete()
+            for rel in relationships_data:
+                if isinstance(rel, dict):
+                    to_person_id = rel.get('person_id')
+                    label = rel.get('label')
+                    inverse_label = rel.get('inverse_label')
+                    order = rel.get('order', 0)
+                    
+                    if to_person_id and label:
+                        try:
+                            to_person = Person.objects.get(id=to_person_id)
+                            PersonRelationship.objects.create(
+                                from_person=instance,
+                                to_person=to_person,
+                                label=label,
+                                inverse_label=inverse_label,
+                                order=order
+                            )
+                        except Person.DoesNotExist:
+                            pass
                 
         return instance
 

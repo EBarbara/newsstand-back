@@ -179,6 +179,22 @@ class PersonLink(models.Model):
         return f"{self.label} ({self.person.name})"
 
 
+class PersonRelationship(models.Model):
+    from_person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name='relationships_from')
+    to_person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name='relationships_to')
+    label = models.CharField(max_length=100, verbose_name='Label (From -> To)')
+    inverse_label = models.CharField(max_length=100, null=True, blank=True, verbose_name='Inverse Label (To -> From)')
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'id']
+        verbose_name = 'Person Relationship'
+        verbose_name_plural = 'Person Relationships'
+
+    def __str__(self) -> str:
+        return f"{self.from_person.name} -> {self.label} -> {self.to_person.name}"
+
+
 class Credit(models.Model):
     IMPORTANCE_CHOICES = [
         (1, 'Major'),      # Protagonist / Star
