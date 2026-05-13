@@ -157,7 +157,12 @@ def process_cbz_file(
         files = [f for f in zf.namelist() if is_image(f)]
         files.sort(key=natural_sort_key)
 
+        if not files:
+            raise ValueError("O arquivo CBZ não contém nenhuma imagem válida (.jpg, .jpeg, .png, .webp).")
+
         log(f"{len(files)} imagens encontradas")
+
+        imported_count = 0
 
         for i, img_filename in enumerate(files, start=start_order):
             data = zf.read(img_filename)
@@ -184,10 +189,13 @@ def process_cbz_file(
                 ContentFile(data),
                 save=True,
             )
+            imported_count += 1
 
             if i % 10 == 0:
                 log(f"{i} páginas importadas...")
 
-    imported_count = len(files)
+    if imported_count == 0:
+        raise ValueError("Nenhuma imagem pôde ser processada no arquivo CBZ.")
+
     log(f"Importação concluída! {imported_count} páginas processadas.")
     return issue, imported_count
