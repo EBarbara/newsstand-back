@@ -409,6 +409,51 @@ class IssueSectionSerializer(serializers.ModelSerializer):
             'order',
         ]
 
+class GlobalIssueSectionSerializer(serializers.ModelSerializer):
+    magazine_name = serializers.CharField(source='issue.magazine.name', read_only=True)
+    magazine_slug = serializers.CharField(source='issue.magazine.slug', read_only=True)
+    issue_edition = serializers.CharField(source='issue.edition', read_only=True)
+    issue_id = serializers.IntegerField(source='issue.id', read_only=True)
+    issue_date = serializers.DateField(source='issue.publishing_date', read_only=True)
+    section_name = serializers.CharField(source='section.name', read_only=True)
+    section_id = serializers.IntegerField(source='section.id', read_only=True)
+    
+    start_page = serializers.SerializerMethodField()
+    first_page_image = serializers.SerializerMethodField()
+    first_page_type = serializers.SerializerMethodField()
+    credits = CreditSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = IssueSection
+        fields = [
+            'id', 'title', 'section_name', 'section_id', 'magazine_name', 'magazine_slug', 
+            'issue_edition', 'issue_date', 'issue_id', 'start_page', 
+            'first_page_image', 'first_page_type', 'credits', 'order'
+        ]
+
+    def get_start_page(self, obj):
+        first_segment = obj.segments.order_by('start_page').first()
+        return first_segment.start_page if first_segment else None
+
+    def _get_first_render(self, obj):
+        start_page = self.get_start_page(obj)
+        if start_page is not None:
+            return obj.issue.renders.filter(order=start_page).first()
+        return None
+
+    def get_first_page_image(self, obj):
+        render = self._get_first_render(obj)
+        if render and render.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(render.image.url)
+            return render.image.url
+        return None
+
+    def get_first_page_type(self, obj):
+        render = self._get_first_render(obj)
+        return render.page_type if render else 'NORMAL'
+
 class IssueSectionWriteSerializer(serializers.ModelSerializer):
     section_id = serializers.PrimaryKeyRelatedField(
         queryset=Section.objects.all(),

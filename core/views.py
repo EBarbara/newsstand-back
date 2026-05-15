@@ -28,6 +28,7 @@ from .serializers import (
     PersonDetailSerializer,
     PersonCreditSerializer,
     TagSerializer,
+    GlobalIssueSectionSerializer,
 )
 
 
@@ -445,3 +446,16 @@ class PersonViewSet(viewsets.ModelViewSet):
 
         serializer = PersonCreditSerializer(credits, many=True, context={'request': request})
         return Response(serializer.data)
+
+class GlobalIssueSectionViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = IssueSection.objects.all().select_related(
+        'issue__magazine', 
+        'section'
+    ).prefetch_related(
+        'segments', 
+        'credits__person'
+    ).order_by('-issue__publishing_date', 'order')
+    
+    serializer_class = GlobalIssueSectionSerializer
+    filter_backends = [django_filters.DjangoFilterBackend]
+    filterset_fields = ['section', 'issue']
