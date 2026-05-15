@@ -32,6 +32,13 @@ from .serializers import (
 )
 
 
+from rest_framework.pagination import PageNumberPagination
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
 class IssueViewSet(viewsets.ModelViewSet):
     queryset = Issue.objects.all()
 
@@ -382,9 +389,9 @@ class TagViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = TagSerializer
 
 class SectionViewSet(viewsets.ModelViewSet):
-    queryset = Section.objects.all()
+    queryset = Section.objects.all().order_by('name')
     serializer_class = SectionSerializer
-    pagination_class = None
+    pagination_class = StandardResultsSetPagination
 
 class IssueSectionViewSet(viewsets.ModelViewSet):
 
@@ -459,3 +466,4 @@ class GlobalIssueSectionViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = GlobalIssueSectionSerializer
     filter_backends = [django_filters.DjangoFilterBackend]
     filterset_fields = ['section', 'issue']
+    pagination_class = StandardResultsSetPagination
