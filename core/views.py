@@ -6,7 +6,7 @@ from decouple import config
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework import status
 from django_filters import rest_framework as django_filters
-from django_filters.rest_framework import FilterSet, CharFilter, DateFilter, ChoiceFilter
+from django_filters.rest_framework import FilterSet, CharFilter, DateFilter, ChoiceFilter, NumberFilter, BooleanFilter
 
 from core.services import process_cbz_file
 
@@ -31,6 +31,25 @@ from .serializers import (
     GlobalIssueSectionSerializer,
 )
 
+class IssueFilter(FilterSet):
+    tag = CharFilter(field_name='tags__slug', lookup_expr='exact')
+    tag_exclude = CharFilter(field_name='tags__slug', lookup_expr='exact', exclude=True)
+    year = NumberFilter(field_name='publishing_date', lookup_expr='year')
+    is_special = BooleanFilter(field_name='is_special')
+    person_tag = CharFilter(method='filter_person_tag_major_credit')
+
+    class Meta:
+        model = Issue
+        fields = ['is_special']
+
+    def filter_person_tag_major_credit(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.filter(
+            issue_sections__credits__person__tags__slug=value,
+            issue_sections__credits__importance=1
+        ).distinct()
+
 
 from rest_framework.pagination import PageNumberPagination
 
@@ -41,6 +60,8 @@ class StandardResultsSetPagination(PageNumberPagination):
 
 class IssueViewSet(viewsets.ModelViewSet):
     queryset = Issue.objects.all()
+    filter_backends = [django_filters.DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_class = IssueFilter
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -48,21 +69,6 @@ class IssueViewSet(viewsets.ModelViewSet):
         qs = qs.select_related('magazine')
         if self.action in ['list', 'recent']:
             qs = qs.prefetch_related('renders', 'tags')
-
-        # Tag filtering
-        tag_slug = self.request.query_params.get('tag')
-        if tag_slug:
-            qs = qs.filter(tags__slug=tag_slug)
-        
-        # Tag exclusion (for "filter out" special editions)
-        exclude_tag = self.request.query_params.get('exclude_tag')
-        if exclude_tag:
-            qs = qs.exclude(tags__slug=exclude_tag)
-
-        # Special Edition filtering
-        is_special = self.request.query_params.get('is_special')
-        if is_special is not None:
-            qs = qs.filter(is_special=is_special.lower() == 'true')
 
         # As identified in debug logs: 'magazine_magazine_slug'
         magazine_slug = self.kwargs.get('magazine_magazine_slug')
