@@ -449,7 +449,7 @@ class MagazineViewSet(viewsets.ReadOnlyModelViewSet):
             qs = qs.filter(tags__slug=tag_slug)
         return qs
 
-class TagViewSet(viewsets.ReadOnlyModelViewSet):
+class TagViewSet(viewsets.ModelViewSet):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
 

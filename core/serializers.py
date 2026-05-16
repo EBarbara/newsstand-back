@@ -104,9 +104,17 @@ class PersonDetailSerializer(serializers.ModelSerializer):
             'credits',
             'relationships',
             'tags',
+            'tag_ids',
             'gender',
             'gender_display'
         ]
+
+    tag_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Tag.objects.all(),
+        source='tags',
+        many=True,
+        required=False
+    )
 
     def to_internal_value(self, data):
         # Create a mutable copy of the data if it's a QueryDict
@@ -208,9 +216,15 @@ class PersonDetailSerializer(serializers.ModelSerializer):
                 relationships_data = rels_raw
 
         # Update main instance fields
+        # ManyToMany fields need to be handled separately or using .set()
+        tags = validated_data.pop('tags', None)
+        
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
+        
+        if tags is not None:
+            instance.tags.set(tags)
         
         # Perform links update if data was provided
         if links_data is not None:
@@ -551,6 +565,13 @@ class IssueReaderSerializer(IssueCoverMixin, serializers.ModelSerializer):
     cover = serializers.SerializerMethodField()
     cover_focus_x = serializers.SerializerMethodField()
     cover_focus_y = serializers.SerializerMethodField()
+    tags = TagSerializer(many=True, read_only=True)
+    tag_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Tag.objects.all(),
+        source='tags',
+        many=True,
+        required=False
+    )
 
     class Meta:
         model = Issue
@@ -568,4 +589,5 @@ class IssueReaderSerializer(IssueCoverMixin, serializers.ModelSerializer):
             'is_digital_complete',
             'is_special',
             'tags',
+            'tag_ids',
         ]
