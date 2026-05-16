@@ -16,6 +16,8 @@ def get_recent_count():
 from PIL import Image
 from django.core.files.base import ContentFile
 from django.db import models, transaction
+from django.db.models import F, Q, ExpressionWrapper, IntegerField, Case, When, Value
+from django.db.models.functions import ExtractYear, ExtractMonth, ExtractDay
 from .models import Issue, Magazine, IssueSection, Section, Render, SectionSegment, Person, Credit, Tag
 from .serializers import (
     IssueListSerializer,
@@ -32,23 +34,80 @@ from .serializers import (
 )
 
 class IssueFilter(FilterSet):
-    tag = CharFilter(field_name='tags__slug', lookup_expr='exact')
-    tag_exclude = CharFilter(field_name='tags__slug', lookup_expr='exact', exclude=True)
+    tag = CharFilter(method='filter_tags_and')
+    tag_exclude = CharFilter(method='filter_tags_exclude_and')
     year = NumberFilter(field_name='publishing_date', lookup_expr='year')
+    year_gt = NumberFilter(field_name='publishing_date', lookup_expr='year__gt')
+    year_gte = NumberFilter(field_name='publishing_date', lookup_expr='year__gte')
+    year_lt = NumberFilter(field_name='publishing_date', lookup_expr='year__lt')
+    year_lte = NumberFilter(field_name='publishing_date', lookup_expr='year__lte')
+    year_ne = NumberFilter(field_name='publishing_date', lookup_expr='year', exclude=True)
     is_special = BooleanFilter(field_name='is_special')
-    person_tag = CharFilter(method='filter_person_tag_major_credit')
+    person_tag = CharFilter(method='filter_person_tags_and')
+    person_age_gt = NumberFilter(method='filter_person_age')
+    person_age_gte = NumberFilter(method='filter_person_age')
+    person_age_lt = NumberFilter(method='filter_person_age')
+    person_age_lte = NumberFilter(method='filter_person_age')
+    person_age_eq = NumberFilter(method='filter_person_age')
+    person_age_ne = NumberFilter(method='filter_person_age')
 
     class Meta:
         model = Issue
         fields = ['is_special']
 
-    def filter_person_tag_major_credit(self, queryset, name, value):
-        if not value:
-            return queryset
+    def filter_tags_and(self, queryset, name, value):
+        tags = self.request.GET.getlist('tag')
+        for t in tags:
+            queryset = queryset.filter(tags__slug=t)
+        return queryset
+
+    def filter_tags_exclude_and(self, queryset, name, value):
+        tags = self.request.GET.getlist('tag_exclude')
+        for t in tags:
+            queryset = queryset.exclude(tags__slug=t)
+        return queryset
+
+    def filter_person_tags_and(self, queryset, name, value):
+        person_tags = self.request.GET.getlist('person_tag')
+        for pt in person_tags:
+            queryset = queryset.filter(
+                issue_sections__credits__person__tags__slug=pt,
+                issue_sections__credits__importance=1
+            )
+        return queryset.distinct()
+
+    def filter_person_age(self, queryset, name, value):
+        op_map = {
+            'person_age_gt': 'gt',
+            'person_age_gte': 'gte',
+            'person_age_lt': 'lt',
+            'person_age_lte': 'lte',
+            'person_age_eq': 'exact',
+            'person_age_ne': 'ne'
+        }
+        op = op_map.get(name, 'exact')
+        
+        # Age calculation logic: Year diff minus 1 if birthday hasn't occurred yet in the publication year
+        age_expr = (
+            ExtractYear('publishing_date') - ExtractYear('issue_sections__credits__person__birth_date') - 
+            Case(
+                When(
+                    Q(publishing_date__month__lt=ExtractMonth('issue_sections__credits__person__birth_date')) |
+                    Q(publishing_date__month=ExtractMonth('issue_sections__credits__person__birth_date'),
+                      publishing_date__day__lt=ExtractDay('issue_sections__credits__person__birth_date')),
+                    then=Value(1)
+                ),
+                default=Value(0),
+                output_field=IntegerField()
+            )
+        )
+        
+        filter_kwargs = {f'_p_age_at_pub__{op}': value}
         return queryset.filter(
-            issue_sections__credits__person__tags__slug=value,
-            issue_sections__credits__importance=1
-        ).distinct()
+            issue_sections__credits__person__birth_date__isnull=False
+        ).annotate(
+            _p_age_at_pub=ExpressionWrapper(age_expr, output_field=IntegerField())
+        ).filter(**filter_kwargs).distinct()
 
 
 from rest_framework.pagination import PageNumberPagination
