@@ -43,6 +43,8 @@ class IssueFilter(FilterSet):
     year_lte = NumberFilter(field_name='publishing_date', lookup_expr='year__lte')
     year_ne = NumberFilter(field_name='publishing_date', lookup_expr='year', exclude=True)
     is_special = BooleanFilter(field_name='is_special')
+    has_physical_copy = BooleanFilter(field_name='has_physical_copy')
+    is_digital_complete = BooleanFilter(field_name='is_digital_complete')
     person_tag = CharFilter(method='filter_person_tags_and')
     person_age_gt = NumberFilter(method='filter_person_age')
     person_age_gte = NumberFilter(method='filter_person_age')
@@ -53,7 +55,7 @@ class IssueFilter(FilterSet):
 
     class Meta:
         model = Issue
-        fields = ['is_special']
+        fields = ['is_special', 'has_physical_copy', 'is_digital_complete']
 
     def filter_tags_and(self, queryset, name, value):
         tags = self.request.GET.getlist('tag')
