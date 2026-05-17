@@ -19,6 +19,7 @@ from django.db import models, transaction
 from django.db.models import F, Q, ExpressionWrapper, IntegerField, Case, When, Value
 from django.db.models.functions import ExtractYear, ExtractMonth, ExtractDay
 from .models import Issue, Magazine, IssueSection, Section, Render, SectionSegment, Person, Credit, Tag
+from .pagination import StandardResultsSetPagination
 from .serializers import (
     IssueListSerializer,
     IssueReaderSerializer,
@@ -111,13 +112,6 @@ class IssueFilter(FilterSet):
             _p_age_at_pub=ExpressionWrapper(age_expr, output_field=IntegerField())
         ).filter(**filter_kwargs).distinct()
 
-
-from rest_framework.pagination import PageNumberPagination
-
-class StandardResultsSetPagination(PageNumberPagination):
-    page_size = 20
-    page_size_query_param = 'page_size'
-    max_page_size = 100
 
 class IssueViewSet(viewsets.ModelViewSet):
     queryset = Issue.objects.all()
