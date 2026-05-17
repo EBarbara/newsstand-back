@@ -523,7 +523,7 @@ class GlobalIssueSectionViewSet(viewsets.ReadOnlyModelViewSet):
     ).prefetch_related(
         'segments', 
         'credits__person'
-    ).order_by('-issue__publishing_date', 'order')
+    ).order_by('-issue__publishing_date', 'order', 'id')
     
     serializer_class = GlobalIssueSectionSerializer
     filter_backends = [django_filters.DjangoFilterBackend, filters.OrderingFilter]
