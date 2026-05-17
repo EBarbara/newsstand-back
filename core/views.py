@@ -526,6 +526,7 @@ class GlobalIssueSectionViewSet(viewsets.ReadOnlyModelViewSet):
     ).order_by('-issue__publishing_date', 'order')
     
     serializer_class = GlobalIssueSectionSerializer
-    filter_backends = [django_filters.DjangoFilterBackend]
+    filter_backends = [django_filters.DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['section', 'issue']
+    ordering_fields = ['issue__publishing_date', 'order']
     pagination_class = StandardResultsSetPagination
