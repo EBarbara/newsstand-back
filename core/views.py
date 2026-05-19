@@ -448,7 +448,7 @@ class IssueViewSet(viewsets.ModelViewSet):
 
         return Response(IssueReaderSerializer(issue, context={'request': request}).data)
 
-class MagazineViewSet(viewsets.ReadOnlyModelViewSet):
+class MagazineViewSet(viewsets.ModelViewSet):
     queryset = Magazine.objects.all()
     serializer_class = MagazineSerializer
     lookup_field = 'slug'
