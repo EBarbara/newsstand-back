@@ -201,6 +201,15 @@ class IssueViewSet(viewsets.ModelViewSet):
                 edition=edition,
                 publishing_date=publishing_date
             )
+            
+            if 'has_physical_copy' in request.data:
+                issue.has_physical_copy = request.data.get('has_physical_copy') in ['true', 'True', True]
+            if 'is_digital_complete' in request.data:
+                issue.is_digital_complete = request.data.get('is_digital_complete') in ['true', 'True', True]
+            if 'is_special' in request.data:
+                issue.is_special = request.data.get('is_special') in ['true', 'True', True]
+            issue.save()
+
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
@@ -242,6 +251,10 @@ class IssueViewSet(viewsets.ModelViewSet):
         magazine_slug = request.data.get('magazine')
         edition = request.data.get('edition')
         publishing_date = request.data.get('date')
+        
+        has_physical_copy = request.data.get('has_physical_copy', False)
+        is_digital_complete = request.data.get('is_digital_complete', False)
+        is_special = request.data.get('is_special', False)
 
         if not all([magazine_slug, edition, publishing_date]):
             return Response({"error": "magazine, edition and date are required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -256,6 +269,9 @@ class IssueViewSet(viewsets.ModelViewSet):
                 magazine=magazine,
                 edition=edition,
                 publishing_date=publishing_date,
+                has_physical_copy=has_physical_copy,
+                is_digital_complete=is_digital_complete,
+                is_special=is_special
             )
         except Exception as e:
             return Response({"error": f"Failed to create issue: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
