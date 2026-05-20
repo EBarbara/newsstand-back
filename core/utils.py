@@ -33,7 +33,7 @@ def calculate_age_at_date(birth_date: Optional[date], event_date: Optional[date]
     Calcula a idade de uma pessoa em uma data específica.
     Trata casos de evento póstumo caso a data de óbito seja fornecida.
     """
-    if not event_date:
+    if not event_date or not birth_date:
         return None
 
     if death_date and death_date <= event_date:
