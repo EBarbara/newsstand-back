@@ -1,38 +1,27 @@
-from django.http import Http404
-from rest_framework import viewsets, filters
-from rest_framework.decorators import action
-from rest_framework.response import Response
+from PIL import Image
 from decouple import config
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from rest_framework import status
+from django.db import transaction
+from django.db.models import Case, When, Q, Value, IntegerField, ExpressionWrapper
+from django.db.models.functions import ExtractYear, ExtractMonth, ExtractDay, Collate
+from django.http import Http404
 from django_filters import rest_framework as django_filters
 from django_filters.rest_framework import FilterSet, CharFilter, DateFilter, ChoiceFilter, NumberFilter, BooleanFilter
+from rest_framework import status
+from rest_framework import viewsets, filters
+from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.response import Response
 
-from core.services import process_cbz_file
+from .models import Issue, Magazine, IssueSection, SectionSegment, Render, Tag, Section, Person, Credit
+from .pagination import StandardResultsSetPagination
+from .serializers import IssueListSerializer, IssueReaderSerializer, MagazineSerializer, TagSerializer, \
+    SectionSerializer, IssueSectionSerializer, IssueSectionWriteSerializer, PersonSerializer, PersonDetailSerializer, \
+    PersonCreditSerializer, GlobalIssueSectionSerializer
+from .services import process_cbz_file
+
 
 def get_recent_count():
     return config('ISSUES_RECENT_COUNT', default=10, cast=int)
-
-from PIL import Image
-from django.core.files.base import ContentFile
-from django.db import models, transaction
-from django.db.models import F, Q, ExpressionWrapper, IntegerField, Case, When, Value
-from django.db.models.functions import ExtractYear, ExtractMonth, ExtractDay
-from .models import Issue, Magazine, IssueSection, Section, Render, SectionSegment, Person, Credit, Tag
-from .pagination import StandardResultsSetPagination
-from .serializers import (
-    IssueListSerializer,
-    IssueReaderSerializer,
-    IssueSectionWriteSerializer,
-    IssueSectionSerializer,
-    MagazineSerializer,
-    SectionSerializer,
-    PersonSerializer,
-    PersonDetailSerializer,
-    PersonCreditSerializer,
-    TagSerializer,
-    GlobalIssueSectionSerializer,
-)
 
 class IssueFilter(FilterSet):
     tag = CharFilter(method='filter_tags_and')
@@ -59,18 +48,24 @@ class IssueFilter(FilterSet):
         fields = ['is_special', 'has_physical_copy', 'is_digital_complete']
 
     def filter_tags_and(self, queryset, name, value):
+        if not self.request:
+            return queryset
         tags = self.request.GET.getlist('tag')
         for t in tags:
             queryset = queryset.filter(tags__slug=t)
         return queryset
 
     def filter_tags_exclude_and(self, queryset, name, value):
+        if not self.request:
+            return queryset
         tags = self.request.GET.getlist('tag_exclude')
         for t in tags:
             queryset = queryset.exclude(tags__slug=t)
         return queryset
 
     def filter_person_tags_and(self, queryset, name, value):
+        if not self.request:
+            return queryset
         person_tags = self.request.GET.getlist('person_tag')
         for pt in person_tags:
             queryset = queryset.filter(
@@ -112,7 +107,6 @@ class IssueFilter(FilterSet):
             _p_age_at_pub=ExpressionWrapper(age_expr, output_field=IntegerField())
         ).filter(**filter_kwargs).distinct()
 
-
 class IssueViewSet(viewsets.ModelViewSet):
     queryset = Issue.objects.all()
     filter_backends = [django_filters.DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -146,7 +140,7 @@ class IssueViewSet(viewsets.ModelViewSet):
         magazine_slug = self.kwargs.get('magazine_magazine_slug')
         lookup_value = self.kwargs.get('pk')
 
-        if magazine_slug and lookup_value:
+        if magazine_slug and isinstance(lookup_value, str):
             # Try lookup by edition first
             try:
                 obj = queryset.get(
@@ -309,7 +303,7 @@ class IssueViewSet(viewsets.ModelViewSet):
             "page": page,
             "image": render.image.url if render else None,
             "section": {
-                "id": issue_section.id,
+                "id": issue_section.pk,
                 "name": issue_section.section.name,
                 "has_text": bool(issue_section.text_content)
             } if issue_section else None
@@ -486,8 +480,6 @@ class IssueSectionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(issue_id=self.kwargs['issue_pk'])
 
-from django.db.models.functions import Collate
-
 class PersonFilter(FilterSet):
     name = CharFilter(lookup_expr='icontains')
     name_exclude = CharFilter(field_name='name', lookup_expr='icontains', exclude=True)
@@ -519,17 +511,17 @@ class PersonViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def credits(self, request, pk=None, **kwargs):
         person = self.get_object()
-        credits = Credit.objects.filter(person=person).select_related(
+        credits_data = Credit.objects.filter(person=person).select_related(
             'issue_section__issue__magazine',
             'issue_section__section'
         ).order_by('-issue_section__issue__publishing_date')
 
-        page = self.paginate_queryset(credits)
+        page = self.paginate_queryset(credits_data)
         if page is not None:
             serializer = PersonCreditSerializer(page, many=True, context={'request': request})
             return self.get_paginated_response(serializer.data)
 
-        serializer = PersonCreditSerializer(credits, many=True, context={'request': request})
+        serializer = PersonCreditSerializer(credits_data, many=True, context={'request': request})
         return Response(serializer.data)
 
 class GlobalIssueSectionViewSet(viewsets.ReadOnlyModelViewSet):

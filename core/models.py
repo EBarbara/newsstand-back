@@ -1,10 +1,13 @@
-from django.core.exceptions import ValidationError
+import os
+from typing import TYPE_CHECKING
+
 from django.db import models
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from django.utils.text import slugify
-import os
 
+if TYPE_CHECKING:
+    from django.db.models import Manager
 
 # Create your models here.
 class Tag(models.Model):
@@ -21,6 +24,7 @@ class Tag(models.Model):
 
     class Meta:
         ordering = ['name']
+
 
 class Magazine(models.Model):
     name = models.CharField(max_length=255)
@@ -40,11 +44,14 @@ class Issue(models.Model):
     publishing_date = models.DateField()
     edition = models.CharField(max_length=255, null=True, blank=True)
 
-    source_file = models.CharField(max_length=1000, null=True, blank=True)
     has_physical_copy = models.BooleanField(default=False, verbose_name='Has Physical Copy')
     is_digital_complete = models.BooleanField(default=False, verbose_name='Is Digital Complete')
     is_special = models.BooleanField(default=False, verbose_name='Is Special Edition')
     tags = models.ManyToManyField(Tag, blank=True, related_name='issues')
+
+    if TYPE_CHECKING:
+        renders: Manager[Render]
+        issue_sections: Manager[IssueSection]
 
     class Meta:
         verbose_name = 'Issue'
@@ -72,8 +79,8 @@ class Render(models.Model):
     order = models.IntegerField()
     is_cover = models.BooleanField(default=False)
     page_type = models.CharField(max_length=10, choices=PAGE_TYPES, default='NORMAL')
-    focus_x = models.IntegerField(default=0) # % from left
-    focus_y = models.IntegerField(default=50) # % from top
+    focus_x = models.IntegerField(default=0)  # % from left
+    focus_y = models.IntegerField(default=50)  # % from top
     width = models.IntegerField()
     height = models.IntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -85,22 +92,8 @@ class Render(models.Model):
         ]
 
 
-class Page(models.Model):
-    issue = models.ForeignKey(Issue, on_delete=models.CASCADE, related_name='pages')
-
-    number = models.IntegerField()
-
-    render = models.ForeignKey(Render, on_delete=models.SET_NULL, null=True)
-
-    class Meta:
-        ordering = ['number']
-        constraints = [
-            models.UniqueConstraint(fields=['issue', 'number'], name='unique_page_number_per_issue')
-        ]
-
-
 class Section(models.Model):
-    name = models.CharField(max_length=255, unique = True)
+    name = models.CharField(max_length=255, unique=True)
 
     class Meta:
         verbose_name = 'Section'
@@ -121,13 +114,16 @@ class IssueSection(models.Model):
         help_text="Optional textual content of the section."
     )
 
+    if TYPE_CHECKING:
+        segments: Manager['SectionSegment']
+        credits: Manager['Credit']
+
 
 class SectionSegment(models.Model):
     issue_section = models.ForeignKey(IssueSection, related_name='segments', on_delete=models.CASCADE)
 
     start_page = models.IntegerField()
     end_page = models.IntegerField()
-
 
 
 class Person(models.Model):
@@ -153,12 +149,16 @@ class Person(models.Model):
         ('NB', 'Não-binário'),
     ]
     gender = models.CharField(
-        max_length=2, 
-        choices=GENDER_CHOICES, 
-        null=True, 
-        blank=True, 
+        max_length=2,
+        choices=GENDER_CHOICES,
+        null=True,
+        blank=True,
         verbose_name='Gênero'
     )
+
+    if TYPE_CHECKING:
+        links: Manager['PersonLink']
+        relationships_from: Manager['PersonRelationship']
 
     class Meta:
         verbose_name = 'Person'
@@ -166,7 +166,7 @@ class Person(models.Model):
         ordering = ['name']
         constraints = [
             models.UniqueConstraint(
-                fields=['name', 'disambiguation'], 
+                fields=['name', 'disambiguation'],
                 name='unique_person_name_disambiguation',
                 nulls_distinct=False
             )
@@ -203,9 +203,9 @@ class PersonRelationship(models.Model):
 
 class Credit(models.Model):
     IMPORTANCE_CHOICES = [
-        (1, 'Major'),      # Protagonist / Star
-        (2, 'Regular'),    # Contributor (Photographer, Writer)
-        (3, 'Minor'),      # Mention / Click / Paparazzi
+        (1, 'Major'),  # Protagonist / Star
+        (2, 'Regular'),  # Contributor (Photographer, Writer)
+        (3, 'Minor'),  # Mention / Click / Paparazzi
     ]
 
     person = models.ForeignKey(Person, on_delete=models.CASCADE, verbose_name='Person')
@@ -218,16 +218,19 @@ class Credit(models.Model):
     role = models.CharField(max_length=255, null=True, blank=True, verbose_name='Role')
     importance = models.IntegerField(choices=IMPORTANCE_CHOICES, default=2, verbose_name='Importance')
     renders = models.ManyToManyField(
-        Render, 
-        blank=True, 
-        related_name='credits', 
+        Render,
+        blank=True,
+        related_name='credits',
         verbose_name='Specific Pages'
     )
 
     class Meta:
         verbose_name = 'Credit'
         verbose_name_plural = 'Credits'
-        ordering = ['importance', 'issue_section__issue__publishing_date', 'issue_section__id', 'role', 'person__name' ]
+        ordering = ['importance', 'issue_section__issue__publishing_date', 'issue_section__id', 'role', 'person__name']
+
+    if TYPE_CHECKING:
+        def get_importance_display(self) -> str: ...            
 
     def __str__(self) -> str:
         role_text = f' as {self.role}' if self.role else ''
@@ -236,14 +239,15 @@ class Credit(models.Model):
 
 
 @receiver(post_delete, sender=Render)
-def delete_render_image(sender, instance, **kwargs):
+def delete_render_image(_sender, instance, **_kwargs):
     """Deletes image file from filesystem when Render object is deleted."""
     if instance.image:
         if os.path.isfile(instance.image.path):
             os.remove(instance.image.path)
 
+
 @receiver(post_delete, sender=Person)
-def delete_person_photo(sender, instance, **kwargs):
+def delete_person_photo(_sender, instance, **_kwargs):
     """Deletes photo file from filesystem when Person object is deleted."""
     if instance.photo:
         if os.path.isfile(instance.photo.path):

@@ -1,3 +1,4 @@
+import json
 from typing import Optional
 
 from django.db import transaction
@@ -5,12 +6,10 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework.request import Request
 
-from .models import Issue, IssueSection, Section, Person, Credit, Magazine, Render, SectionSegment, PersonLink, Tag, PersonRelationship
+from .models import Issue, IssueSection, Section, Person, Credit, Magazine, Render, SectionSegment, PersonLink, Tag, \
+    PersonRelationship
+from .utils import get_absolute_media_url, get_issue_cover, calculate_age_at_date
 
-class TagSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Tag
-        fields = ['id', 'name', 'slug']
 
 class IssueCoverMixin:
     context: dict
@@ -19,18 +18,10 @@ class IssueCoverMixin:
         request: Request | None = self.context.get("request")
         cover = self._get_cover_render(obj)
         if cover is None: return None
-        url = cover.image.url
-        if request is not None:
-            return request.build_absolute_uri(url)
-        return url
+        return get_absolute_media_url(cover.image.url, request)
 
     def _get_cover_render(self, obj) -> Optional[Render]:
-        # Prioritize renders marked as covers
-        cover = obj.renders.filter(is_cover=True).first()
-        # Fallback to the first render by order
-        if not cover:
-            cover = obj.renders.first()
-        return cover
+        return get_issue_cover(obj)
 
     def get_cover_focus_x(self, obj):
         cover = self._get_cover_render(obj)
@@ -40,31 +31,45 @@ class IssueCoverMixin:
         cover = self._get_cover_render(obj)
         return cover.focus_y if cover else 50
 
+
+class TagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = ['id', 'name', 'slug']
+
+
 class RenderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Render
         fields = ['id', 'order', 'image', 'is_cover', 'page_type', 'focus_x', 'focus_y', 'width', 'height']
+
 
 class SectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Section
         fields = ['id', 'name']
 
+
 class SectionSegmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = SectionSegment
         fields = ['start_page', 'end_page']
 
+
 class PersonSerializer(serializers.ModelSerializer):
     gender_display = serializers.CharField(source='get_gender_display', read_only=True)
+
     class Meta:
         model = Person
-        fields = ['id', 'name', 'photo', 'photo_focus_x', 'photo_focus_y', 'aliases', 'disambiguation', 'birth_date', 'death_date', 'country', 'tags', 'gender', 'gender_display']
+        fields = ['id', 'name', 'photo', 'photo_focus_x', 'photo_focus_y', 'aliases', 'disambiguation', 'birth_date',
+                  'death_date', 'country', 'tags', 'gender', 'gender_display']
+
 
 class PersonLinkSerializer(serializers.ModelSerializer):
     class Meta:
         model = PersonLink
         fields = ['id', 'url', 'label']
+
 
 class PersonRelationshipSerializer(serializers.ModelSerializer):
     # This is a flat representation for the frontend
@@ -78,6 +83,7 @@ class PersonRelationshipSerializer(serializers.ModelSerializer):
         model = PersonRelationship
         fields = ['id', 'person_id', 'person_name', 'label', 'inverse_label', 'is_from', 'order']
 
+
 class PersonDetailSerializer(serializers.ModelSerializer):
     links = PersonLinkSerializer(many=True, required=False)
     # We'll use a SerializerMethodField to get credits with issue info
@@ -89,18 +95,18 @@ class PersonDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Person
         fields = [
-            'id', 
-            'name', 
+            'id',
+            'name',
             'disambiguation',
-            'birth_date', 
+            'birth_date',
             'death_date',
-            'country', 
-            'biography', 
-            'photo', 
+            'country',
+            'biography',
+            'photo',
             'photo_focus_x',
             'photo_focus_y',
             'aliases',
-            'links', 
+            'links',
             'credits',
             'relationships',
             'tags',
@@ -125,7 +131,6 @@ class PersonDetailSerializer(serializers.ModelSerializer):
         links = data.get('links')
         if isinstance(links, str):
             try:
-                import json
                 parsed_links = json.loads(links)
                 # QueryDict requires setlist to handle lists correctly
                 if hasattr(data, 'setlist'):
@@ -134,12 +139,11 @@ class PersonDetailSerializer(serializers.ModelSerializer):
                     data['links'] = parsed_links
             except (json.JSONDecodeError, TypeError):
                 pass
-        
+
         # Handle relationships passed as a JSON string
         relationships = data.get('relationships')
         if isinstance(relationships, str):
             try:
-                import json
                 parsed_rels = json.loads(relationships)
                 if hasattr(data, 'setlist'):
                     data.setlist('relationships', parsed_rels)
@@ -147,15 +151,15 @@ class PersonDetailSerializer(serializers.ModelSerializer):
                     data['relationships'] = parsed_rels
             except (json.JSONDecodeError, TypeError):
                 pass
-        
+
         return super().to_internal_value(data)
 
     def get_credits(self, obj):
-        credits = Credit.objects.filter(person=obj).select_related(
+        credits_data = Credit.objects.filter(person=obj).select_related(
             'issue_section__issue__magazine',
             'issue_section__section'
         )
-        return PersonCreditSerializer(credits, many=True, context=self.context).data
+        return PersonCreditSerializer(credits_data, many=True, context=self.context).data
 
     def get_relationships(self, obj):
         rels = []
@@ -185,19 +189,18 @@ class PersonDetailSerializer(serializers.ModelSerializer):
         return sorted(rels, key=lambda x: (x['order'], x['id']))
 
     @transaction.atomic
-    def update(self, instance, validated_data):
+    def update(self, instance: Person, validated_data: dict) -> Person:
         # Pop links_data from validated_data
         links_data = validated_data.pop('links', None)
-        
+
         # Fallback: if links_data is None, try to get it from initial_data
         # This covers cases where DRF validation might have skipped or failed the nested field
         if links_data is None and 'links' in self.initial_data:
             links_raw = self.initial_data.get('links')
             if isinstance(links_raw, str):
                 try:
-                    import json
                     links_data = json.loads(links_raw)
-                except:
+                except (json.JSONDecodeError, TypeError):
                     pass
             elif isinstance(links_raw, list):
                 links_data = links_raw
@@ -208,9 +211,8 @@ class PersonDetailSerializer(serializers.ModelSerializer):
             rels_raw = self.initial_data.get('relationships')
             if isinstance(rels_raw, str):
                 try:
-                    import json
                     relationships_data = json.loads(rels_raw)
-                except:
+                except (json.JSONDecodeError, TypeError):
                     pass
             elif isinstance(rels_raw, list):
                 relationships_data = rels_raw
@@ -218,14 +220,14 @@ class PersonDetailSerializer(serializers.ModelSerializer):
         # Update main instance fields
         # ManyToMany fields need to be handled separately or using .set()
         tags = validated_data.pop('tags', None)
-        
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
-        
+
         if tags is not None:
             instance.tags.set(tags)
-        
+
         # Perform links update if data was provided
         if links_data is not None:
             instance.links.all().delete()
@@ -237,24 +239,24 @@ class PersonDetailSerializer(serializers.ModelSerializer):
                     label = link.get('label')
                     if url and label:
                         PersonLink.objects.create(
-                            person=instance, 
-                            url=url, 
+                            person=instance,
+                            url=url,
                             label=label
                         )
-        
+
         # Perform relationships update
         if relationships_data is not None:
             # This is tricky because we only want to delete/update records where THIS person is 'from_person'
             # OR where they are 'to_person' but the record belongs to the relationship list.
-            
+
             # Simple approach for now: delete all relationships where this person is 'from_person'
             # and recreate them. 
             # Note: Relationships where this person is 'to_person' are managed by the other person's profile,
             # BUT the user might want to edit them here.
-            
+
             # To keep it simple and avoid complex logic, we'll only allow editing relationships
             # where the current person is 'from_person'.
-            
+
             instance.relationships_from.all().delete()
             for rel in relationships_data:
                 if isinstance(rel, dict):
@@ -262,7 +264,7 @@ class PersonDetailSerializer(serializers.ModelSerializer):
                     label = rel.get('label')
                     inverse_label = rel.get('inverse_label')
                     order = rel.get('order', 0)
-                    
+
                     if to_person_id and label:
                         try:
                             to_person = Person.objects.get(id=to_person_id)
@@ -275,8 +277,9 @@ class PersonDetailSerializer(serializers.ModelSerializer):
                             )
                         except Person.DoesNotExist:
                             pass
-                
+
         return instance
+
 
 class PersonCreditSerializer(serializers.ModelSerializer):
     magazine_name = serializers.CharField(source='issue_section.issue.magazine.name', read_only=True)
@@ -300,18 +303,18 @@ class PersonCreditSerializer(serializers.ModelSerializer):
     class Meta:
         model = Credit
         fields = [
-            'id', 
-            'role', 
+            'id',
+            'role',
             'importance',
-            'magazine_name', 
-            'magazine_slug', 
-            'issue_edition', 
+            'magazine_name',
+            'magazine_slug',
+            'issue_edition',
             'issue_date',
-            'issue_id', 
+            'issue_id',
             'issue_cover',
             'issue_cover_focus_x',
             'issue_cover_focus_y',
-            'section_title', 
+            'section_title',
             'section_type',
             'start_page',
             'render_ids',
@@ -323,7 +326,7 @@ class PersonCreditSerializer(serializers.ModelSerializer):
         first_render = obj.renders.order_by('order').first()
         if first_render:
             return first_render.order
-            
+
         # Fallback to the first segment of the section
         first_segment = obj.issue_section.segments.order_by('start_page').first()
         return first_segment.start_page if first_segment else None
@@ -331,40 +334,18 @@ class PersonCreditSerializer(serializers.ModelSerializer):
     def get_age_at_issue(self, obj):
         person = obj.person
         issue_date = obj.issue_section.issue.publishing_date
-        
-        if not issue_date:
-            return None
-
-        # Check if posthumous
-        if person.death_date and person.death_date <= issue_date:
-            return "póstumo"
-            
-        if not person.birth_date:
-            return None
-            
-        age = issue_date.year - person.birth_date.year - (
-            (issue_date.month, issue_date.day) < (person.birth_date.month, person.birth_date.day)
-        )
-        return f"({age} anos)"
+        return calculate_age_at_date(person.birth_date, issue_date, person.death_date)
 
     def _get_cover_render(self, obj) -> Optional[Render]:
-        issue = obj.issue_section.issue
-        # Prioritize renders marked as covers
-        cover = issue.renders.filter(is_cover=True).first()
-        # Fallback to order 0
-        if not cover:
-            cover = issue.renders.filter(order=0).first()
-        # Ultimate fallback to any render
-        if not cover:
-            cover = issue.renders.all().first()
-        return cover
+        return get_issue_cover(obj.issue_section.issue)
 
     def get_cover_image(self, obj):
         try:
             cover = self._get_cover_render(obj)
             if cover and cover.image:
-                return cover.image.url
-        except Exception:
+                request = self.context.get('request')
+                return get_absolute_media_url(cover.image.url, request)
+        except (AttributeError, ValueError):
             pass
         return None
 
@@ -375,6 +356,7 @@ class PersonCreditSerializer(serializers.ModelSerializer):
     def get_issue_cover_focus_y(self, obj):
         cover = self._get_cover_render(obj)
         return cover.focus_y if cover else 50
+
 
 class CreditSerializer(serializers.ModelSerializer):
     person = PersonSerializer(read_only=True)
@@ -397,14 +379,8 @@ class CreditSerializer(serializers.ModelSerializer):
     def get_age_at_issue(self, obj):
         person = obj.person
         issue_date = obj.issue_section.issue.publishing_date
-        
-        if not person.birth_date or not issue_date:
-            return None
-            
-        age = issue_date.year - person.birth_date.year - (
-            (issue_date.month, issue_date.day) < (person.birth_date.month, person.birth_date.day)
-        )
-        return f"({age} anos)"
+        return calculate_age_at_date(person.birth_date, issue_date, person.death_date)
+
 
 class IssueSectionSerializer(serializers.ModelSerializer):
     section = SectionSerializer(read_only=True)
@@ -423,6 +399,7 @@ class IssueSectionSerializer(serializers.ModelSerializer):
             'order',
         ]
 
+
 class GlobalIssueSectionSerializer(serializers.ModelSerializer):
     magazine_name = serializers.CharField(source='issue.magazine.name', read_only=True)
     magazine_slug = serializers.CharField(source='issue.magazine.slug', read_only=True)
@@ -431,7 +408,7 @@ class GlobalIssueSectionSerializer(serializers.ModelSerializer):
     issue_date = serializers.DateField(source='issue.publishing_date', read_only=True)
     section_name = serializers.CharField(source='section.name', read_only=True)
     section_id = serializers.IntegerField(source='section.id', read_only=True)
-    
+
     start_page = serializers.SerializerMethodField()
     first_page_image = serializers.SerializerMethodField()
     first_page_type = serializers.SerializerMethodField()
@@ -440,33 +417,32 @@ class GlobalIssueSectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = IssueSection
         fields = [
-            'id', 'title', 'section_name', 'section_id', 'magazine_name', 'magazine_slug', 
-            'issue_edition', 'issue_date', 'issue_id', 'start_page', 
+            'id', 'title', 'section_name', 'section_id', 'magazine_name', 'magazine_slug',
+            'issue_edition', 'issue_date', 'issue_id', 'start_page',
             'first_page_image', 'first_page_type', 'credits', 'order'
         ]
 
-    def get_start_page(self, obj):
+    def get_start_page(self, obj: IssueSection):
         first_segment = obj.segments.order_by('start_page').first()
         return first_segment.start_page if first_segment else None
 
-    def _get_first_render(self, obj):
+    def _get_first_render(self, obj: IssueSection) -> Optional[Render]:
         start_page = self.get_start_page(obj)
         if start_page is not None:
             return obj.issue.renders.filter(order=start_page).first()
         return None
 
-    def get_first_page_image(self, obj):
+    def get_first_page_image(self, obj: IssueSection) -> Optional[str]:
         render = self._get_first_render(obj)
         if render and render.image:
             request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(render.image.url)
-            return render.image.url
+            return get_absolute_media_url(render.image.url, request)
         return None
 
     def get_first_page_type(self, obj):
         render = self._get_first_render(obj)
         return render.page_type if render else 'NORMAL'
+
 
 class IssueSectionWriteSerializer(serializers.ModelSerializer):
     section_id = serializers.PrimaryKeyRelatedField(
@@ -499,15 +475,15 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data: dict) -> IssueSection:
-        segments_data = validated_data.pop('segments', None)
-        credits_data = validated_data.pop('credits', None)
-        
+        segments_data = validated_data.pop('segments', [])
+        credits_data = validated_data.pop('credits', [])
+
         issue_section = IssueSection.objects.create(**validated_data)
 
         if segments_data:
             for seg in segments_data:
                 SectionSegment.objects.create(issue_section=issue_section, **seg)
-            
+
         if credits_data:
             for credit in credits_data:
                 renders = credit.pop('renders', [])
@@ -518,19 +494,19 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def update(self, instance: IssueSection, validated_data: dict) -> IssueSection:
-        segments_data = validated_data.pop('segments', None)
-        credits_data = validated_data.pop('credits', None)
-
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
+        for attr, value in list(validated_data.items()):
+            if attr not in ['segments', 'credits']:
+                setattr(instance, attr, value)
         instance.save()
 
-        if segments_data is not None:
+        if 'segments' in validated_data:
+            segments_data = validated_data.pop('segments')
             instance.segments.all().delete()
             for seg in segments_data:
                 SectionSegment.objects.create(issue_section=instance, **seg)
-                
-        if credits_data is not None:
+
+        if 'credits' in validated_data:
+            credits_data = validated_data.pop('credits')
             instance.credits.all().delete()
             for credit in credits_data:
                 renders = credit.pop('renders', [])
@@ -542,11 +518,14 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         return IssueSectionSerializer(instance, context=self.context).data
 
+
 class MagazineSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
+
     class Meta:
         model = Magazine
         fields = ['name', 'slug', 'tags']
+
 
 class IssueListSerializer(IssueCoverMixin, serializers.ModelSerializer):
     magazine = MagazineSerializer(read_only=True)
@@ -556,7 +535,9 @@ class IssueListSerializer(IssueCoverMixin, serializers.ModelSerializer):
 
     class Meta:
         model = Issue
-        fields = ['id', 'publishing_date', 'edition', 'magazine', 'cover', 'cover_focus_x', 'cover_focus_y', 'has_physical_copy', 'is_digital_complete', 'is_special', 'tags']
+        fields = ['id', 'publishing_date', 'edition', 'magazine', 'cover', 'cover_focus_x', 'cover_focus_y',
+                  'has_physical_copy', 'is_digital_complete', 'is_special', 'tags']
+
 
 class IssueReaderSerializer(IssueCoverMixin, serializers.ModelSerializer):
     magazine = MagazineSerializer(read_only=True)

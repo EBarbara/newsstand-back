@@ -5,7 +5,7 @@ from datetime import date
 from pathlib import Path
 from typing import TypedDict, Optional, Any, Callable
 
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from django.core.files.base import ContentFile
 from django.utils.text import slugify
 
@@ -87,6 +87,10 @@ def process_cbz_file(
 ) -> tuple[Issue, int]:
     """
     Processa um arquivo CBZ (file_obj) e importa suas imagens para um Issue.
+    :param append:
+    :param edition:
+    :param publishing_date:
+    :param magazine_slug:
     :param file_obj: Pode ser um objeto de arquivo aberto (open(path, 'rb')) ou um UploadedFile do Django.
     :param filename: Nome do arquivo original (usado para extrair metadata se necessário).
     :param logger: Uma função opcional que recebe strings, para fins de log de progresso.
@@ -142,7 +146,7 @@ def process_cbz_file(
         if created:
             log(f"Issue criado: {issue}")
 
-    log(f"Importando CBZ para Issue {issue.id} ({issue})...")
+    log(f"Importando CBZ para Issue {issue.pk} ({issue})...")
 
     start_order = 1
     if not append:
@@ -169,7 +173,7 @@ def process_cbz_file(
             try:
                 image = Image.open(io.BytesIO(data))
                 width, height = image.size
-            except Exception:
+            except (OSError, UnidentifiedImageError):
                 log(f"AVISO: Erro ao ler imagem: {img_filename}")
                 continue
 

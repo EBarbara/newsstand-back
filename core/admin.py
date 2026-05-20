@@ -1,5 +1,7 @@
 from django.contrib import admin
-from .models import Magazine, Issue, Render, Page, Section, IssueSection, SectionSegment, Person, PersonLink, Credit, Tag
+
+from .models import Magazine, Issue, Render, Section, IssueSection, Person, PersonLink, Credit, Tag
+
 
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
