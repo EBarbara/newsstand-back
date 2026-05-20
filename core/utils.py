@@ -39,7 +39,7 @@ def calculate_age_at_date(birth_date: Optional[date], event_date: Optional[date]
     if death_date and death_date <= event_date:
         return "póstumo"
 
-    age = relativedelta(birth_date, event_date).years
+    age = relativedelta(event_date, birth_date).years
     return f'({age} anos)'
 
 def get_absolute_media_url(url: Optional[str], request: Optional[Request]) -> Optional[str]:
