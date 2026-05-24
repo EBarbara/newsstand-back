@@ -34,6 +34,7 @@ class Magazine(models.Model):
     slug = models.SlugField(unique=True, db_index=True)
     description = models.TextField(null=True, blank=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='magazines')
+    logo = models.ImageField(upload_to='logos/', null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -239,16 +240,16 @@ class Credit(models.Model):
 
 
 @receiver(post_delete, sender=Render)
-def delete_render_image(_sender, instance, **_kwargs):
-    """Deletes image file from filesystem when Render object is deleted."""
-    if instance.image:
-        if os.path.isfile(instance.image.path):
-            os.remove(instance.image.path)
-
-
 @receiver(post_delete, sender=Person)
-def delete_person_photo(_sender, instance, **_kwargs):
-    """Deletes photo file from filesystem when Person object is deleted."""
-    if instance.photo:
-        if os.path.isfile(instance.photo.path):
-            os.remove(instance.photo.path)
+@receiver(post_delete, sender=Magazine)
+def delete_files_on_delete(sender, instance, **kwargs):
+    """Deletes uploaded files from filesystem when the model instance is deleted."""
+    for field in instance._meta.fields:
+        if isinstance(field, models.FileField):
+            file_field = getattr(instance, field.name)
+            if file_field and file_field.name:
+                try:
+                    if os.path.isfile(file_field.path):
+                        os.remove(file_field.path)
+                except (OSError, ValueError):
+                    pass

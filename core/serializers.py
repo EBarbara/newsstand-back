@@ -521,10 +521,84 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
 
 class MagazineSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
+    tag_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Tag.objects.all(),
+        source='tags',
+        many=True,
+        required=False
+    )
+    logo = serializers.ImageField(required=False, allow_null=True)
+    issues_count = serializers.SerializerMethodField()
+    periodic_issues_count = serializers.SerializerMethodField()
+    special_issues_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Magazine
-        fields = ['name', 'slug', 'tags']
+        fields = [
+            'id', 'name', 'slug', 'publisher', 'language', 'country', 
+            'description', 'tags', 'tag_ids', 'logo', 'issues_count', 
+            'periodic_issues_count', 'special_issues_count'
+        ]
+
+    def get_issues_count(self, obj) -> int:
+        return obj.issue_set.count()
+
+    def get_periodic_issues_count(self, obj) -> int:
+        return obj.issue_set.filter(is_special=False).count()
+
+    def get_special_issues_count(self, obj) -> int:
+        return obj.issue_set.filter(is_special=True).count()
+
+    def to_internal_value(self, data):
+        if hasattr(data, 'copy'):
+            data = data.copy()
+
+        tag_ids = data.get('tag_ids')
+        if isinstance(tag_ids, str):
+            try:
+                parsed_ids = json.loads(tag_ids)
+                if hasattr(data, 'setlist'):
+                    data.setlist('tag_ids', parsed_ids)
+                else:
+                    data['tag_ids'] = parsed_ids
+            except (json.JSONDecodeError, TypeError):
+                if ',' in tag_ids:
+                    parsed_ids = [int(x.strip()) for x in tag_ids.split(',') if x.strip().isdigit()]
+                    if hasattr(data, 'setlist'):
+                        data.setlist('tag_ids', parsed_ids)
+                    else:
+                        data['tag_ids'] = parsed_ids
+                elif tag_ids.isdigit():
+                    parsed_ids = [int(tag_ids)]
+                    if hasattr(data, 'setlist'):
+                        data.setlist('tag_ids', parsed_ids)
+                    else:
+                        data['tag_ids'] = parsed_ids
+
+        return super().to_internal_value(data)
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        tags = validated_data.pop('tags', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if tags is not None:
+            instance.tags.set(tags)
+            
+        return instance
+
+    @transaction.atomic
+    def create(self, validated_data):
+        tags = validated_data.pop('tags', None)
+        instance = Magazine.objects.create(**validated_data)
+        
+        if tags is not None:
+            instance.tags.set(tags)
+            
+        return instance
 
 
 class IssueListSerializer(IssueCoverMixin, serializers.ModelSerializer):
