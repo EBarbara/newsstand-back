@@ -91,11 +91,6 @@ class Issue(models.Model):
                 name='unique_issue_per_magazine_volume_edition',
                 nulls_distinct=False
             ),
-            models.UniqueConstraint(
-                fields=['magazine', 'volume', 'publishing_date'],
-                name='unique_issue_per_magazine_volume_date',
-                nulls_distinct=False
-            ),
         ]
 
     def __str__(self) -> str:
