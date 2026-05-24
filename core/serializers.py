@@ -296,6 +296,7 @@ class PersonCreditSerializer(serializers.ModelSerializer):
     magazine_name = serializers.CharField(source='issue_section.issue.magazine.name', read_only=True)
     magazine_slug = serializers.CharField(source='issue_section.issue.magazine.slug', read_only=True)
     issue_edition = serializers.CharField(source='issue_section.issue.edition', read_only=True)
+    issue_volume = serializers.CharField(source='issue_section.issue.volume', read_only=True, allow_null=True)
     issue_id = serializers.IntegerField(source='issue_section.issue.id', read_only=True)
     issue_cover = serializers.SerializerMethodField(method_name='get_cover_image')
     issue_cover_focus_x = serializers.SerializerMethodField()
@@ -320,6 +321,7 @@ class PersonCreditSerializer(serializers.ModelSerializer):
             'magazine_name',
             'magazine_slug',
             'issue_edition',
+            'issue_volume',
             'issue_date',
             'issue_id',
             'issue_cover',
@@ -415,6 +417,7 @@ class GlobalIssueSectionSerializer(serializers.ModelSerializer):
     magazine_name = serializers.CharField(source='issue.magazine.name', read_only=True)
     magazine_slug = serializers.CharField(source='issue.magazine.slug', read_only=True)
     issue_edition = serializers.CharField(source='issue.edition', read_only=True)
+    issue_volume = serializers.CharField(source='issue.volume', read_only=True, allow_null=True)
     issue_id = serializers.IntegerField(source='issue.id', read_only=True)
     issue_date = serializers.DateField(source='issue.publishing_date', read_only=True)
     section_name = serializers.CharField(source='section.name', read_only=True)
@@ -429,7 +432,7 @@ class GlobalIssueSectionSerializer(serializers.ModelSerializer):
         model = IssueSection
         fields = [
             'id', 'title', 'section_name', 'section_id', 'magazine_name', 'magazine_slug',
-            'issue_edition', 'issue_date', 'issue_id', 'start_page',
+            'issue_edition', 'issue_volume', 'issue_date', 'issue_id', 'start_page',
             'first_page_image', 'first_page_type', 'credits', 'order'
         ]
 
