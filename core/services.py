@@ -61,9 +61,13 @@ def parse_cbz_filename(filename: str) -> ParsedCBZ:
     if volume and volume.isdigit() and len(volume) == 4:
         year = int(volume)
 
-    # --- edição (#105A)
-    edition_match = re.search(r"#([a-zA-Z0-9]+)", name)
-    edition = edition_match.group(1).zfill(2) if edition_match else None
+    # --- edição (#105A, #3-4, #3_4)
+    edition_match = re.search(r"#([a-zA-Z0-9_\-\/]+)", name)
+    edition = edition_match.group(1) if edition_match else None
+    if edition:
+        edition = edition.replace("-", "/").replace("_", "/")
+        if edition.isdigit():
+            edition = edition.zfill(2)
 
     # --- mês e ano textual (August, 1975)
     date_match = re.search(r"\(([^,]+),\s*(\d{4})\)", name)
@@ -140,16 +144,35 @@ def process_cbz_file(
                 "Forneça magazine_slug e edition, ou certifique-se que o nome do arquivo contém essas informações."
             )
 
+        # --- obter ou criar magazine
+        existing_magazine = None
+        if magazine_slug:
+            existing_magazine = Magazine.objects.filter(slug=magazine_slug).first()
+
+        mag_defaults = {"name": parsed["magazine_name"] if parsed and parsed.get("magazine_name") else magazine_slug}
+        
+        # --- determinar volume do issue vs volume do magazine
         if parsed and not volume:
             parsed_volume = parsed.get("volume")
             parsed_year = parsed.get("year")
-            if parsed_volume and not parsed_year:
-                volume = parsed_volume
-
-        # --- criar/pegar magazine
-        mag_defaults = {"name": parsed["magazine_name"] if parsed and parsed.get("magazine_name") else magazine_slug}
-        if parsed and parsed.get("year"):
-            mag_defaults["volume"] = str(parsed["year"])
+            
+            if parsed_volume:
+                # Decidir se o volume pertence à Revista (publicação) ou à Edição (numeração)
+                belongs_to_magazine = False
+                
+                if existing_magazine:
+                    if existing_magazine.volume and existing_magazine.volume == parsed_volume:
+                        belongs_to_magazine = True
+                else:
+                    # Se a revista ainda não existe no banco, olhamos se o slug termina com o ano do volume
+                    if parsed_year and magazine_slug.endswith(str(parsed_year)):
+                        belongs_to_magazine = True
+                
+                if belongs_to_magazine:
+                    mag_defaults["volume"] = parsed_volume
+                    volume = None
+                else:
+                    volume = parsed_volume
 
         magazine, _ = Magazine.objects.get_or_create(
             slug=magazine_slug,
