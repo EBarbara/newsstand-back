@@ -65,7 +65,7 @@ def parse_cbz_filename(filename: str) -> ParsedCBZ:
     edition_match = re.search(r"#([a-zA-Z0-9_\-\/]+)", name)
     edition = edition_match.group(1) if edition_match else None
     if edition:
-        edition = edition.replace("-", "/").replace("_", "/")
+        edition = edition.replace("_", "-").replace("/", "-")
         if edition.isdigit():
             edition = edition.zfill(2)
 
