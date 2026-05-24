@@ -141,16 +141,34 @@ class IssueViewSet(viewsets.ModelViewSet):
         lookup_value = self.kwargs.get('pk')
 
         if magazine_slug and isinstance(lookup_value, str):
-            # Try lookup by edition first
             try:
-                obj = queryset.get(
+                candidates = queryset.filter(
                     magazine__slug=magazine_slug,
                     edition__iexact=lookup_value
                 )
-                self.check_object_permissions(self.request, obj)
-                return obj
+                
+                volume = self.request.query_params.get('volume')
+                if volume:
+                    candidates = candidates.filter(volume=volume)
+                
+                if candidates.count() == 1:
+                    obj = candidates.first()
+                    self.check_object_permissions(self.request, obj)
+                    return obj
+                elif candidates.count() > 1:
+                    if lookup_value.isdigit():
+                        try:
+                            obj = queryset.get(pk=lookup_value)
+                            self.check_object_permissions(self.request, obj)
+                            return obj
+                        except Issue.DoesNotExist:
+                            pass
+                    obj = candidates.first()
+                    self.check_object_permissions(self.request, obj)
+                    return obj
+                else:
+                    raise Issue.DoesNotExist
             except Issue.DoesNotExist:
-                # Fallback to ID
                 if lookup_value.isdigit():
                     try:
                         obj = queryset.get(pk=lookup_value)
@@ -186,6 +204,7 @@ class IssueViewSet(viewsets.ModelViewSet):
         magazine_slug = request.data.get('magazine')
         edition = request.data.get('edition')
         publishing_date = request.data.get('date')
+        volume = request.data.get('volume')
 
         try:
             issue, count = process_cbz_file(
@@ -193,7 +212,8 @@ class IssueViewSet(viewsets.ModelViewSet):
                 filename=file_obj.name,
                 magazine_slug=magazine_slug,
                 edition=edition,
-                publishing_date=publishing_date
+                publishing_date=publishing_date,
+                volume=volume
             )
             
             if 'has_physical_copy' in request.data:
@@ -245,6 +265,7 @@ class IssueViewSet(viewsets.ModelViewSet):
         magazine_slug = request.data.get('magazine')
         edition = request.data.get('edition')
         publishing_date = request.data.get('date')
+        volume = request.data.get('volume')
         
         has_physical_copy = request.data.get('has_physical_copy', False)
         is_digital_complete = request.data.get('is_digital_complete', False)
@@ -262,6 +283,7 @@ class IssueViewSet(viewsets.ModelViewSet):
             issue = Issue.objects.create(
                 magazine=magazine,
                 edition=edition,
+                volume=volume,
                 publishing_date=publishing_date,
                 has_physical_copy=has_physical_copy,
                 is_digital_complete=is_digital_complete,

@@ -548,7 +548,7 @@ class MagazineSerializer(serializers.ModelSerializer):
         model = Magazine
         fields = [
             'id', 'name', 'slug', 'publisher', 'language', 'country', 'country_code',
-            'description', 'tags', 'tag_ids', 'logo', 'issues_count', 
+            'volume', 'description', 'tags', 'tag_ids', 'logo', 'issues_count', 
             'periodic_issues_count', 'special_issues_count'
         ]
 
@@ -625,7 +625,7 @@ class IssueListSerializer(IssueCoverMixin, serializers.ModelSerializer):
 
     class Meta:
         model = Issue
-        fields = ['id', 'publishing_date', 'edition', 'magazine', 'cover', 'cover_focus_x', 'cover_focus_y',
+        fields = ['id', 'publishing_date', 'edition', 'volume', 'magazine', 'cover', 'cover_focus_x', 'cover_focus_y',
                   'has_physical_copy', 'is_digital_complete', 'is_special', 'tags']
 
 
@@ -650,6 +650,7 @@ class IssueReaderSerializer(IssueCoverMixin, serializers.ModelSerializer):
             'id',
             'publishing_date',
             'edition',
+            'volume',
             'magazine',
             'cover',
             'cover_focus_x',

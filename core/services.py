@@ -36,9 +36,11 @@ def natural_sort_key(s: str):
 
 class ParsedCBZ(TypedDict):
     magazine_name: Optional[str]
+    volume: Optional[str]
     year: Optional[int]
     edition: Optional[str]
     publishing_date: Optional[date]
+
 
 def parse_cbz_filename(filename: str) -> ParsedCBZ:
     name = filename.replace(".cbz", "")
@@ -46,10 +48,18 @@ def parse_cbz_filename(filename: str) -> ParsedCBZ:
     # --- magazine (tudo antes de "Vol.")
     magazine_match = re.match(r"^(.*?)\s+Vol\.", name)
     magazine = magazine_match.group(1).strip() if magazine_match else None
+    if not magazine:
+        # Fallback
+        magazine = name.strip()
 
-    # --- ano do volume
-    year_match = re.search(r"Vol\.(\d{4})", name)
-    year = int(year_match.group(1)) if year_match else None
+    # --- volume flexível (qualquer número ou ano depois de Vol.)
+    volume_match = re.search(r"Vol\.([a-zA-Z0-9]+)", name)
+    volume = volume_match.group(1).strip() if volume_match else None
+
+    # --- ano do volume (se for um ano de 4 dígitos)
+    year = None
+    if volume and volume.isdigit() and len(volume) == 4:
+        year = int(volume)
 
     # --- edição (#105A)
     edition_match = re.search(r"#([a-zA-Z0-9]+)", name)
@@ -70,10 +80,12 @@ def parse_cbz_filename(filename: str) -> ParsedCBZ:
 
     return {
         "magazine_name": magazine,
+        "volume": volume,
         "year": year,
         "edition": edition,
         "publishing_date": publishing_date,
     }
+
 
 def process_cbz_file(
     file_obj: Any,
@@ -83,7 +95,8 @@ def process_cbz_file(
     publishing_date: Optional[date | str] = None,
     logger: Optional[Callable[[str], None]] = None,
     issue: Optional[Issue] = None,
-    append: bool = False
+    append: bool = False,
+    volume: Optional[str] = None,
 ) -> tuple[Issue, int]:
     """
     Processa um arquivo CBZ (file_obj) e importa suas imagens para um Issue.
@@ -114,7 +127,11 @@ def process_cbz_file(
                 publishing_date = pub_date_parsed
 
             if magazine_name and not magazine_slug:
-                magazine_slug = slugify(str(magazine_name))
+                year = parsed.get("year")
+                if year:
+                    magazine_slug = f"{slugify(str(magazine_name))}-{year}"
+                else:
+                    magazine_slug = slugify(str(magazine_name))
 
         # --- validação mínima
         if not magazine_slug or not edition:
@@ -123,10 +140,20 @@ def process_cbz_file(
                 "Forneça magazine_slug e edition, ou certifique-se que o nome do arquivo contém essas informações."
             )
 
+        if parsed and not volume:
+            parsed_volume = parsed.get("volume")
+            parsed_year = parsed.get("year")
+            if parsed_volume and not parsed_year:
+                volume = parsed_volume
+
         # --- criar/pegar magazine
+        mag_defaults = {"name": parsed["magazine_name"] if parsed and parsed.get("magazine_name") else magazine_slug}
+        if parsed and parsed.get("year"):
+            mag_defaults["volume"] = str(parsed["year"])
+
         magazine, _ = Magazine.objects.get_or_create(
             slug=magazine_slug,
-            defaults={"name": parsed["magazine_name"] if parsed and parsed.get("magazine_name") else magazine_slug}
+            defaults=mag_defaults
         )
 
         # --- data
@@ -140,6 +167,7 @@ def process_cbz_file(
         issue, created = Issue.objects.get_or_create(
             magazine=magazine,
             edition=edition,
+            volume=volume,
             defaults={"publishing_date": publishing_date},
         )
 

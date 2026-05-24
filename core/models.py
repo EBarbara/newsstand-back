@@ -32,18 +32,45 @@ class Magazine(models.Model):
     language = models.CharField(max_length=255, null=True, blank=True)
     country = models.CharField(max_length=255, null=True, blank=True)
     slug = models.SlugField(unique=True, db_index=True)
+    volume = models.CharField(max_length=255, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='magazines')
     logo = models.ImageField(upload_to='logos/', null=True, blank=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['name', 'volume'],
+                name='unique_magazine_name_volume',
+                nulls_distinct=False
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        base_slug = slugify(self.name)
+        expected_slug = f"{base_slug}-{slugify(self.volume)}" if self.volume else base_slug
+        
+        if not self.slug:
+            self.slug = expected_slug
+        elif self.pk:
+            try:
+                orig = Magazine.objects.get(pk=self.pk)
+                if orig.name != self.name or orig.volume != self.volume:
+                    self.slug = expected_slug
+            except Magazine.DoesNotExist:
+                pass
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return self.name
+        volume_str = f' (Vol. {self.volume})' if self.volume else ''
+        return f"{self.name}{volume_str}"
 
 
 class Issue(models.Model):
     magazine = models.ForeignKey(Magazine, on_delete=models.CASCADE)
     publishing_date = models.DateField()
     edition = models.CharField(max_length=255, null=True, blank=True)
+    volume = models.CharField(max_length=255, null=True, blank=True)
 
     has_physical_copy = models.BooleanField(default=False, verbose_name='Has Physical Copy')
     is_digital_complete = models.BooleanField(default=False, verbose_name='Is Digital Complete')
@@ -59,13 +86,27 @@ class Issue(models.Model):
         verbose_name_plural = 'Issues'
         ordering = ['-publishing_date', '-edition']
         constraints = [
-            models.UniqueConstraint(fields=['publishing_date', 'edition'], name='unique_issue_per_date_edition'),
-            models.UniqueConstraint(fields=['magazine', 'edition'], name='unique_issue_per_magazine_edition'),
+            models.UniqueConstraint(
+                fields=['magazine', 'volume', 'edition'],
+                name='unique_issue_per_magazine_volume_edition',
+                nulls_distinct=False
+            ),
+            models.UniqueConstraint(
+                fields=['magazine', 'volume', 'publishing_date'],
+                name='unique_issue_per_magazine_volume_date',
+                nulls_distinct=False
+            ),
         ]
 
     def __str__(self) -> str:
-        edition_str = f' Ed. {self.edition} ' if self.edition else ''
-        return f"{self.publishing_date.strftime('%b/%y')}{edition_str}"
+        volume_str = f' Vol. {self.volume}' if self.volume else ''
+        edition_str = f' Ed. {self.edition}' if self.edition else ''
+        parts = [self.publishing_date.strftime('%b/%y')]
+        if volume_str:
+            parts.append(volume_str.strip())
+        if edition_str:
+            parts.append(edition_str.strip())
+        return " - ".join(parts)
 
 
 class Render(models.Model):
