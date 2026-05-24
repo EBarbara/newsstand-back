@@ -52,3 +52,19 @@ def get_absolute_media_url(url: Optional[str], request: Optional[Request]) -> Op
     if request is not None:
         return request.build_absolute_uri(url)
     return url
+
+def resolve_country_code(country_name: Optional[str]) -> Optional[str]:
+    """
+    Resolves the 2-letter ISO country code from the database using a case-insensitive lookup.
+    """
+    if not country_name:
+        return None
+    normalized = country_name.lower().strip()
+    if len(normalized) == 2:
+        return normalized
+    
+    from .models import CountryMapping
+    mapping = CountryMapping.objects.filter(name=normalized).first()
+    if mapping:
+        return mapping.code
+    return None

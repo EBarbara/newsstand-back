@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import Magazine, Issue, Render, Section, IssueSection, Person, PersonLink, Credit, Tag
+from .models import Magazine, Issue, Render, Section, IssueSection, Person, PersonLink, Credit, Tag, CountryMapping
+
+
+@admin.register(CountryMapping)
+class CountryMappingAdmin(admin.ModelAdmin):
+    list_display = ('name', 'code')
+    search_fields = ('name', 'code')
 
 
 @admin.register(Tag)

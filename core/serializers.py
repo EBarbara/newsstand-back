@@ -58,11 +58,16 @@ class SectionSegmentSerializer(serializers.ModelSerializer):
 
 class PersonSerializer(serializers.ModelSerializer):
     gender_display = serializers.CharField(source='get_gender_display', read_only=True)
+    country_code = serializers.SerializerMethodField()
 
     class Meta:
         model = Person
         fields = ['id', 'name', 'photo', 'photo_focus_x', 'photo_focus_y', 'aliases', 'disambiguation', 'birth_date',
-                  'death_date', 'country', 'tags', 'gender', 'gender_display']
+                  'death_date', 'country', 'country_code', 'tags', 'gender', 'gender_display']
+
+    def get_country_code(self, obj):
+        from .utils import resolve_country_code
+        return resolve_country_code(obj.country)
 
 
 class PersonLinkSerializer(serializers.ModelSerializer):
@@ -91,6 +96,7 @@ class PersonDetailSerializer(serializers.ModelSerializer):
     relationships = serializers.SerializerMethodField()
     tags = TagSerializer(many=True, read_only=True)
     gender_display = serializers.CharField(source='get_gender_display', read_only=True)
+    country_code = serializers.SerializerMethodField()
 
     class Meta:
         model = Person
@@ -101,6 +107,7 @@ class PersonDetailSerializer(serializers.ModelSerializer):
             'birth_date',
             'death_date',
             'country',
+            'country_code',
             'biography',
             'photo',
             'photo_focus_x',
@@ -114,6 +121,10 @@ class PersonDetailSerializer(serializers.ModelSerializer):
             'gender',
             'gender_display'
         ]
+
+    def get_country_code(self, obj):
+        from .utils import resolve_country_code
+        return resolve_country_code(obj.country)
 
     tag_ids = serializers.PrimaryKeyRelatedField(
         queryset=Tag.objects.all(),
@@ -531,14 +542,19 @@ class MagazineSerializer(serializers.ModelSerializer):
     issues_count = serializers.SerializerMethodField()
     periodic_issues_count = serializers.SerializerMethodField()
     special_issues_count = serializers.SerializerMethodField()
+    country_code = serializers.SerializerMethodField()
 
     class Meta:
         model = Magazine
         fields = [
-            'id', 'name', 'slug', 'publisher', 'language', 'country', 
+            'id', 'name', 'slug', 'publisher', 'language', 'country', 'country_code',
             'description', 'tags', 'tag_ids', 'logo', 'issues_count', 
             'periodic_issues_count', 'special_issues_count'
         ]
+
+    def get_country_code(self, obj):
+        from .utils import resolve_country_code
+        return resolve_country_code(obj.country)
 
     def get_issues_count(self, obj) -> int:
         return obj.issue_set.count()

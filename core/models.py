@@ -239,6 +239,24 @@ class Credit(models.Model):
         return f"{self.person}{role_text}{importance_text} in {self.issue_section}"
 
 
+class CountryMapping(models.Model):
+    name = models.CharField(max_length=255, unique=True, help_text="Common name or alias of the country (e.g. 'brasil', 'coreia do sul', 'kr')")
+    code = models.CharField(max_length=2, help_text="2-letter ISO 3166-1 country code (e.g. 'br', 'kr', 'bf')")
+
+    def save(self, *args, **kwargs):
+        self.name = self.name.lower().strip()
+        self.code = self.code.lower().strip()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.name} -> {self.code.upper()}"
+
+    class Meta:
+        verbose_name = 'Country Mapping'
+        verbose_name_plural = 'Country Mappings'
+        ordering = ['name']
+
+
 @receiver(post_delete, sender=Render)
 @receiver(post_delete, sender=Person)
 @receiver(post_delete, sender=Magazine)
