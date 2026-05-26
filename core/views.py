@@ -469,6 +469,8 @@ class MagazineViewSet(viewsets.ModelViewSet):
     serializer_class = MagazineSerializer
     lookup_field = 'slug'
     lookup_url_kwarg = 'magazine_slug'
+    filter_backends = [django_filters.DjangoFilterBackend, filters.SearchFilter]
+    search_fields = ['name', 'publisher', 'description']
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -481,11 +483,15 @@ class TagViewSet(viewsets.ModelViewSet):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     lookup_field = 'slug'
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name', 'slug']
 
 class SectionViewSet(viewsets.ModelViewSet):
     queryset = Section.objects.all().order_by('name')
     serializer_class = SectionSerializer
     pagination_class = StandardResultsSetPagination
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name']
 
 class IssueSectionViewSet(viewsets.ModelViewSet):
 
