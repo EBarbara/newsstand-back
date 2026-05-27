@@ -11,9 +11,10 @@ class CountryMappingAdmin(admin.ModelAdmin):
 
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
-    list_display = ('name', 'slug')
+    list_display = ('name', 'slug', 'parent', 'description')
+    list_filter = ('parent',)
     prepopulated_fields = {'slug': ('name',)}
-    search_fields = ('name',)
+    search_fields = ('name', 'parent__name', 'description')
 
 @admin.register(Magazine)
 class MagazineAdmin(admin.ModelAdmin):

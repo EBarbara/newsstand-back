@@ -32,10 +32,108 @@ class IssueCoverMixin:
         return cover.focus_y if cover else 50
 
 
-class TagSerializer(serializers.ModelSerializer):
+def get_lowest_level_tags(tags):
+    """Filters a list/queryset of Tag objects, keeping only leaf/lowest-level tags in the hierarchy."""
+    if not tags:
+        return []
+    tags_list = list(tags)
+    ancestor_ids = set()
+    for t in tags_list:
+        curr = t.parent
+        while curr:
+            ancestor_ids.add(curr.id)
+            curr = curr.parent
+    return [t for t in tags_list if t.id not in ancestor_ids]
+
+
+class TagSimpleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
         fields = ['id', 'name', 'slug']
+
+
+class TagSerializer(serializers.ModelSerializer):
+    parent_id = serializers.PrimaryKeyRelatedField(
+        queryset=Tag.objects.all(),
+        source='parent',
+        required=False,
+        allow_null=True
+    )
+
+    class Meta:
+        model = Tag
+        fields = ['id', 'name', 'slug', 'description', 'image', 'parent_id']
+
+    def to_internal_value(self, data):
+        if 'image' in data and (data['image'] == '' or data['image'] == 'null'):
+            if hasattr(data, 'copy'):
+                data = data.copy()
+            data['image'] = None
+        return super().to_internal_value(data)
+
+
+class TagTreeSerializer(serializers.ModelSerializer):
+    children = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Tag
+        fields = ['id', 'name', 'slug', 'children']
+
+    def get_children(self, obj):
+        return TagTreeSerializer(obj.children.all(), many=True).data
+
+
+class TagDetailSerializer(serializers.ModelSerializer):
+    parent = TagSimpleSerializer(read_only=True)
+    parent_id = serializers.PrimaryKeyRelatedField(
+        queryset=Tag.objects.all(),
+        source='parent',
+        required=False,
+        allow_null=True
+    )
+    children = TagSimpleSerializer(many=True, read_only=True)
+    ancestors = serializers.SerializerMethodField()
+    descendants_tree = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Tag
+        fields = ['id', 'name', 'slug', 'description', 'image', 'parent', 'parent_id', 'children', 'ancestors', 'descendants_tree']
+
+    def to_internal_value(self, data):
+        if 'image' in data and (data['image'] == '' or data['image'] == 'null'):
+            if hasattr(data, 'copy'):
+                data = data.copy()
+            data['image'] = None
+        return super().to_internal_value(data)
+
+    def get_ancestors(self, obj):
+        ancestors = []
+        curr = obj.parent
+        while curr:
+            ancestors.insert(0, TagSimpleSerializer(curr).data)
+            curr = curr.parent
+        return ancestors
+
+    def get_descendants_tree(self, obj):
+        return TagTreeSerializer(obj.children.all(), many=True).data
+
+    def validate_parent(self, value):
+        if value is None:
+            return value
+        
+        if self.instance and value.id == self.instance.id:
+            raise serializers.ValidationError("Uma tag não pode ser mãe de si mesma.")
+            
+        if self.instance:
+            curr = value
+            while curr:
+                if curr.id == self.instance.id:
+                    raise serializers.ValidationError(
+                        "Relação circular detectada: a tag pai proposta é um descendente desta tag."
+                    )
+                curr = curr.parent
+                
+        return value
 
 
 class RenderSerializer(serializers.ModelSerializer):
@@ -59,6 +157,7 @@ class SectionSegmentSerializer(serializers.ModelSerializer):
 class PersonSerializer(serializers.ModelSerializer):
     gender_display = serializers.CharField(source='get_gender_display', read_only=True)
     country_code = serializers.SerializerMethodField()
+    tags = serializers.SerializerMethodField()
 
     class Meta:
         model = Person
@@ -68,6 +167,10 @@ class PersonSerializer(serializers.ModelSerializer):
     def get_country_code(self, obj):
         from .utils import resolve_country_code
         return resolve_country_code(obj.country)
+
+    def get_tags(self, obj):
+        lowest_tags = get_lowest_level_tags(obj.tags.all())
+        return TagSerializer(lowest_tags, many=True, context=self.context).data
 
 
 class PersonLinkSerializer(serializers.ModelSerializer):
@@ -94,7 +197,7 @@ class PersonDetailSerializer(serializers.ModelSerializer):
     # We'll use a SerializerMethodField to get credits with issue info
     credits = serializers.SerializerMethodField()
     relationships = serializers.SerializerMethodField()
-    tags = TagSerializer(many=True, read_only=True)
+    tags = serializers.SerializerMethodField()
     gender_display = serializers.CharField(source='get_gender_display', read_only=True)
     country_code = serializers.SerializerMethodField()
 
@@ -125,6 +228,10 @@ class PersonDetailSerializer(serializers.ModelSerializer):
     def get_country_code(self, obj):
         from .utils import resolve_country_code
         return resolve_country_code(obj.country)
+
+    def get_tags(self, obj):
+        lowest_tags = get_lowest_level_tags(obj.tags.all())
+        return TagSerializer(lowest_tags, many=True, context=self.context).data
 
     tag_ids = serializers.PrimaryKeyRelatedField(
         queryset=Tag.objects.all(),
@@ -532,9 +639,8 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         return IssueSectionSerializer(instance, context=self.context).data
 
-
 class MagazineSerializer(serializers.ModelSerializer):
-    tags = TagSerializer(many=True, read_only=True)
+    tags = serializers.SerializerMethodField()
     tag_ids = serializers.PrimaryKeyRelatedField(
         queryset=Tag.objects.all(),
         source='tags',
@@ -567,6 +673,10 @@ class MagazineSerializer(serializers.ModelSerializer):
 
     def get_special_issues_count(self, obj) -> int:
         return obj.issue_set.filter(is_special=True).count()
+
+    def get_tags(self, obj):
+        lowest_tags = get_lowest_level_tags(obj.tags.all())
+        return TagSerializer(lowest_tags, many=True, context=self.context).data
 
     def to_internal_value(self, data):
         if hasattr(data, 'copy'):
@@ -625,11 +735,16 @@ class IssueListSerializer(IssueCoverMixin, serializers.ModelSerializer):
     cover = serializers.SerializerMethodField()
     cover_focus_x = serializers.SerializerMethodField()
     cover_focus_y = serializers.SerializerMethodField()
+    tags = serializers.SerializerMethodField()
 
     class Meta:
         model = Issue
         fields = ['id', 'publishing_date', 'edition', 'volume', 'magazine', 'cover', 'cover_focus_x', 'cover_focus_y',
                   'has_physical_copy', 'is_digital_complete', 'is_special', 'tags']
+
+    def get_tags(self, obj):
+        lowest_tags = get_lowest_level_tags(obj.tags.all())
+        return TagSerializer(lowest_tags, many=True, context=self.context).data
 
 
 class IssueReaderSerializer(IssueCoverMixin, serializers.ModelSerializer):
@@ -639,7 +754,7 @@ class IssueReaderSerializer(IssueCoverMixin, serializers.ModelSerializer):
     cover = serializers.SerializerMethodField()
     cover_focus_x = serializers.SerializerMethodField()
     cover_focus_y = serializers.SerializerMethodField()
-    tags = TagSerializer(many=True, read_only=True)
+    tags = serializers.SerializerMethodField()
     tag_ids = serializers.PrimaryKeyRelatedField(
         queryset=Tag.objects.all(),
         source='tags',
@@ -666,3 +781,7 @@ class IssueReaderSerializer(IssueCoverMixin, serializers.ModelSerializer):
             'tags',
             'tag_ids',
         ]
+
+    def get_tags(self, obj):
+        lowest_tags = get_lowest_level_tags(obj.tags.all())
+        return TagSerializer(lowest_tags, many=True, context=self.context).data

@@ -14,7 +14,7 @@ from rest_framework.response import Response
 
 from .models import Issue, Magazine, IssueSection, SectionSegment, Render, Tag, Section, Person, Credit
 from .pagination import StandardResultsSetPagination
-from .serializers import IssueListSerializer, IssueReaderSerializer, MagazineSerializer, TagSerializer, \
+from .serializers import IssueListSerializer, IssueReaderSerializer, MagazineSerializer, TagSerializer, TagDetailSerializer, \
     SectionSerializer, IssueSectionSerializer, IssueSectionWriteSerializer, PersonSerializer, PersonDetailSerializer, \
     PersonCreditSerializer, GlobalIssueSectionSerializer
 from .services import process_cbz_file
@@ -25,6 +25,7 @@ def get_recent_count():
 
 class IssueFilter(FilterSet):
     tag = CharFilter(method='filter_tags_and')
+    tag_direct = CharFilter(method='filter_tags_direct')
     tag_exclude = CharFilter(method='filter_tags_exclude_and')
     year = NumberFilter(field_name='publishing_date', lookup_expr='year')
     year_gt = NumberFilter(field_name='publishing_date', lookup_expr='year__gt')
@@ -52,16 +53,34 @@ class IssueFilter(FilterSet):
             return queryset
         tags = self.request.GET.getlist('tag')
         for t in tags:
+            try:
+                tag_obj = Tag.objects.get(slug=t)
+                descendant_slugs = tag_obj.get_descendant_slugs()
+                queryset = queryset.filter(tags__slug__in=descendant_slugs)
+            except Tag.DoesNotExist:
+                queryset = queryset.none()
+        return queryset.distinct()
+
+    def filter_tags_direct(self, queryset, name, value):
+        if not self.request:
+            return queryset
+        tags = self.request.GET.getlist('tag_direct')
+        for t in tags:
             queryset = queryset.filter(tags__slug=t)
-        return queryset
+        return queryset.distinct()
 
     def filter_tags_exclude_and(self, queryset, name, value):
         if not self.request:
             return queryset
         tags = self.request.GET.getlist('tag_exclude')
         for t in tags:
-            queryset = queryset.exclude(tags__slug=t)
-        return queryset
+            try:
+                tag_obj = Tag.objects.get(slug=t)
+                descendant_slugs = tag_obj.get_descendant_slugs()
+                queryset = queryset.exclude(tags__slug__in=descendant_slugs)
+            except Tag.DoesNotExist:
+                pass
+        return queryset.distinct()
 
     def filter_person_tags_and(self, queryset, name, value):
         if not self.request:
@@ -483,8 +502,14 @@ class TagViewSet(viewsets.ModelViewSet):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     lookup_field = 'slug'
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'slug']
+
+    def get_serializer_class(self):
+        if self.action in ['retrieve', 'update', 'partial_update']:
+            return TagDetailSerializer
+        return TagSerializer
 
 class SectionViewSet(viewsets.ModelViewSet):
     queryset = Section.objects.all().order_by('name')
@@ -513,8 +538,9 @@ class PersonFilter(FilterSet):
     name_exclude = CharFilter(field_name='name', lookup_expr='icontains', exclude=True)
     birth_date_after = DateFilter(field_name='birth_date', lookup_expr='gte')
     birth_date_before = DateFilter(field_name='birth_date', lookup_expr='lte')
-    tag = CharFilter(field_name='tags__slug', lookup_expr='exact')
-    tag_exclude = CharFilter(field_name='tags__slug', lookup_expr='exact', exclude=True)
+    tag = CharFilter(method='filter_tag')
+    tag_direct = CharFilter(method='filter_tag_direct')
+    tag_exclude = CharFilter(method='filter_tag_exclude')
     gender = ChoiceFilter(choices=Person.GENDER_CHOICES)
     gender_exclude = ChoiceFilter(field_name='gender', choices=Person.GENDER_CHOICES, exclude=True)
     country_exclude = CharFilter(field_name='country', lookup_expr='exact', exclude=True)
@@ -522,6 +548,25 @@ class PersonFilter(FilterSet):
     class Meta:
         model = Person
         fields = ['gender', 'country']
+
+    def filter_tag(self, queryset, name, value):
+        try:
+            tag_obj = Tag.objects.get(slug=value)
+            descendant_slugs = tag_obj.get_descendant_slugs()
+            return queryset.filter(tags__slug__in=descendant_slugs).distinct()
+        except Tag.DoesNotExist:
+            return queryset.none()
+
+    def filter_tag_direct(self, queryset, name, value):
+        return queryset.filter(tags__slug=value).distinct()
+
+    def filter_tag_exclude(self, queryset, name, value):
+        try:
+            tag_obj = Tag.objects.get(slug=value)
+            descendant_slugs = tag_obj.get_descendant_slugs()
+            return queryset.exclude(tags__slug__in=descendant_slugs).distinct()
+        except Tag.DoesNotExist:
+            return queryset
 
 class PersonViewSet(viewsets.ModelViewSet):
     queryset = Person.objects.all().order_by(Collate('name', 'und-x-icu'))

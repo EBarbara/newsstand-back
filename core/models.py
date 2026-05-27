@@ -13,6 +13,9 @@ if TYPE_CHECKING:
 class Tag(models.Model):
     name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(unique=True, blank=True)
+    parent = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='children')
+    description = models.TextField(null=True, blank=True)
+    image = models.ImageField(upload_to='tags/', null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -21,6 +24,18 @@ class Tag(models.Model):
 
     def __str__(self):
         return self.name
+
+    def get_descendant_ids(self):
+        ids = [self.id]
+        for child in self.children.all():
+            ids.extend(child.get_descendant_ids())
+        return ids
+
+    def get_descendant_slugs(self):
+        slugs = [self.slug]
+        for child in self.children.all():
+            slugs.extend(child.get_descendant_slugs())
+        return slugs
 
     class Meta:
         ordering = ['name']
@@ -296,6 +311,7 @@ class CountryMapping(models.Model):
 @receiver(post_delete, sender=Render)
 @receiver(post_delete, sender=Person)
 @receiver(post_delete, sender=Magazine)
+@receiver(post_delete, sender=Tag)
 def delete_files_on_delete(sender, instance, **kwargs):
     """Deletes uploaded files from filesystem when the model instance is deleted."""
     for field in instance._meta.fields:
