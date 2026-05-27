@@ -552,6 +552,16 @@ class PersonViewSet(viewsets.ModelViewSet):
         serializer = PersonCreditSerializer(credits_data, many=True, context={'request': request})
         return Response(serializer.data)
 
+class IssueSectionFilter(FilterSet):
+    section = NumberFilter(field_name='section_id')
+    issue = NumberFilter(field_name='issue_id')
+    magazine = CharFilter(field_name='issue__magazine__slug')
+    year = NumberFilter(field_name='issue__publishing_date', lookup_expr='year')
+
+    class Meta:
+        model = IssueSection
+        fields = ['section', 'issue', 'magazine', 'year']
+
 class GlobalIssueSectionViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = IssueSection.objects.all().select_related(
         'issue__magazine', 
@@ -562,7 +572,8 @@ class GlobalIssueSectionViewSet(viewsets.ReadOnlyModelViewSet):
     ).order_by('-issue__publishing_date', 'order', 'id')
     
     serializer_class = GlobalIssueSectionSerializer
-    filter_backends = [django_filters.DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['section', 'issue']
+    filter_backends = [django_filters.DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_class = IssueSectionFilter
+    search_fields = ['title', 'text_content', 'section__name', 'issue__magazine__name']
     ordering_fields = ['issue__publishing_date', 'order']
     pagination_class = StandardResultsSetPagination
