@@ -589,6 +589,15 @@ class PersonViewSet(viewsets.ModelViewSet):
             'issue_section__section'
         ).order_by('-issue_section__issue__publishing_date')
 
+        importance_param = request.query_params.get('importance')
+        if importance_param:
+            try:
+                importances = [int(i.strip()) for i in importance_param.split(',') if i.strip().isdigit()]
+                if importances:
+                    credits_data = credits_data.filter(importance__in=importances)
+            except ValueError:
+                pass
+
         page = self.paginate_queryset(credits_data)
         if page is not None:
             serializer = PersonCreditSerializer(page, many=True, context={'request': request})
