@@ -4,7 +4,7 @@ from typing import Optional
 from dateutil.relativedelta import relativedelta
 from rest_framework.request import Request
 
-from .models import Render, Issue
+from .models import CountryMapping, Render, Issue
 
 
 def get_issue_cover(issue: Optional[Issue]) -> Optional[Render]:
@@ -63,7 +63,7 @@ def resolve_country_code(country_name: Optional[str]) -> Optional[str]:
     if len(normalized) == 2:
         return normalized
     
-    from .models import CountryMapping
+    
     mapping = CountryMapping.objects.filter(name=normalized).first()
     if mapping:
         return mapping.code
