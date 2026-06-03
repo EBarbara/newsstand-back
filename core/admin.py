@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Magazine, Issue, Render, Section, IssueSection, Person, PersonLink, Credit, Tag, CountryMapping
+from .models import Magazine, Issue, Render, Section, IssueSection, Person, PersonLink, Credit, Tag, CountryMapping, IssueSectionRelationship
 
 
 @admin.register(CountryMapping)
@@ -40,3 +40,5 @@ admin.site.register(IssueSection)
 admin.site.register(Credit)
 admin.site.register(PersonLink)
 admin.site.register(Render)
+admin.site.register(IssueSectionRelationship)
+

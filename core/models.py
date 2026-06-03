@@ -169,6 +169,8 @@ class IssueSection(models.Model):
     if TYPE_CHECKING:
         segments: Manager['SectionSegment']
         credits: Manager['Credit']
+        relationships_from: Manager['IssueSectionRelationship']
+        relationships_to: Manager['IssueSectionRelationship']
 
 
 class SectionSegment(models.Model):
@@ -176,6 +178,29 @@ class SectionSegment(models.Model):
 
     start_page = models.IntegerField()
     end_page = models.IntegerField()
+
+
+class IssueSectionRelationship(models.Model):
+    from_issue_section = models.ForeignKey(IssueSection, on_delete=models.CASCADE, related_name='relationships_from')
+    to_issue_section = models.ForeignKey(IssueSection, on_delete=models.CASCADE, related_name='relationships_to')
+    label = models.CharField(max_length=100, verbose_name='Label (From -> To)')
+    inverse_label = models.CharField(max_length=100, null=True, blank=True, verbose_name='Inverse Label (To -> From)')
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'id']
+        verbose_name = 'IssueSection Relationship'
+        verbose_name_plural = 'IssueSection Relationships'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['from_issue_section', 'to_issue_section'],
+                name='unique_issuesection_relationship'
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.from_issue_section} -> {self.label} -> {self.to_issue_section}"
+
 
 
 class Person(models.Model):

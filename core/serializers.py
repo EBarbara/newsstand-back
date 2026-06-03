@@ -7,7 +7,7 @@ from rest_framework import serializers
 from rest_framework.request import Request
 
 from .models import Issue, IssueSection, Section, Person, Credit, Magazine, Render, SectionSegment, PersonLink, Tag, \
-    PersonRelationship
+    PersonRelationship, IssueSectionRelationship
 from .utils import get_absolute_media_url, get_issue_cover, calculate_age_at_date
 
 
@@ -502,10 +502,72 @@ class CreditSerializer(serializers.ModelSerializer):
         return calculate_age_at_date(person.birth_date, issue_date, person.death_date)
 
 
+class IssueSectionRelationshipSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IssueSectionRelationship
+        fields = ['id', 'from_issue_section', 'to_issue_section', 'label', 'inverse_label', 'order']
+
+
+def get_section_relationships(obj: IssueSection) -> list:
+    rels = []
+    # Relationships where obj is from_issue_section
+    for r in obj.relationships_from.all().select_related(
+        'to_issue_section__issue__magazine',
+        'to_issue_section__section'
+    ):
+        first_segment = r.to_issue_section.segments.order_by('start_page').first()
+        start_page = first_segment.start_page if first_segment else None
+
+        rels.append({
+            'id': r.id,
+            'issue_section_id': r.to_issue_section.id,
+            'issue_section_title': r.to_issue_section.title,
+            'section_name': r.to_issue_section.section.name,
+            'magazine_name': r.to_issue_section.issue.magazine.name,
+            'magazine_slug': r.to_issue_section.issue.magazine.slug,
+            'issue_edition': r.to_issue_section.issue.edition,
+            'issue_volume': r.to_issue_section.issue.volume,
+            'issue_id': r.to_issue_section.issue.id,
+            'start_page': start_page,
+            'label': r.label,
+            'inverse_label': r.inverse_label,
+            'is_from': True,
+            'order': r.order
+        })
+
+    # Relationships where obj is to_issue_section
+    for r in obj.relationships_to.all().select_related(
+        'from_issue_section__issue__magazine',
+        'from_issue_section__section'
+    ):
+        if r.inverse_label:
+            first_segment = r.from_issue_section.segments.order_by('start_page').first()
+            start_page = first_segment.start_page if first_segment else None
+
+            rels.append({
+                'id': r.id,
+                'issue_section_id': r.from_issue_section.id,
+                'issue_section_title': r.from_issue_section.title,
+                'section_name': r.from_issue_section.section.name,
+                'magazine_name': r.from_issue_section.issue.magazine.name,
+                'magazine_slug': r.from_issue_section.issue.magazine.slug,
+                'issue_edition': r.from_issue_section.issue.edition,
+                'issue_volume': r.from_issue_section.issue.volume,
+                'issue_id': r.from_issue_section.issue.id,
+                'start_page': start_page,
+                'label': r.inverse_label,
+                'inverse_label': r.label,
+                'is_from': False,
+                'order': r.order
+            })
+    return sorted(rels, key=lambda x: (x['order'], x['id']))
+
+
 class IssueSectionSerializer(serializers.ModelSerializer):
     section = SectionSerializer(read_only=True)
     segments = SectionSegmentSerializer(many=True, read_only=True)
     credits = CreditSerializer(many=True, read_only=True)
+    relationships = serializers.SerializerMethodField()
 
     class Meta:
         model = IssueSection
@@ -516,8 +578,12 @@ class IssueSectionSerializer(serializers.ModelSerializer):
             'text_content',
             'segments',
             'credits',
+            'relationships',
             'order',
         ]
+
+    def get_relationships(self, obj):
+        return get_section_relationships(obj)
 
 
 class GlobalIssueSectionSerializer(serializers.ModelSerializer):
@@ -534,14 +600,18 @@ class GlobalIssueSectionSerializer(serializers.ModelSerializer):
     first_page_image = serializers.SerializerMethodField()
     first_page_type = serializers.SerializerMethodField()
     credits = CreditSerializer(many=True, read_only=True)
+    relationships = serializers.SerializerMethodField()
 
     class Meta:
         model = IssueSection
         fields = [
             'id', 'title', 'section_name', 'section_id', 'magazine_name', 'magazine_slug',
             'issue_edition', 'issue_volume', 'issue_date', 'issue_id', 'start_page',
-            'first_page_image', 'first_page_type', 'credits', 'order'
+            'first_page_image', 'first_page_type', 'credits', 'relationships', 'order'
         ]
+
+    def get_relationships(self, obj):
+        return get_section_relationships(obj)
 
     def get_start_page(self, obj: IssueSection):
         first_segment = obj.segments.order_by('start_page').first()
@@ -573,10 +643,11 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
 
     segments = SectionSegmentSerializer(many=True)
     credits = CreditSerializer(many=True, required=False)
+    relationships = serializers.JSONField(required=False, write_only=True)
 
     class Meta:
         model = IssueSection
-        fields = ['id', 'section_id', 'title', 'text_content', 'order', 'segments', 'credits']
+        fields = ['id', 'section_id', 'title', 'text_content', 'order', 'segments', 'credits', 'relationships']
 
     def validate_segments(self, value):
         for seg in value:
@@ -598,6 +669,7 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
     def create(self, validated_data: dict) -> IssueSection:
         segments_data = validated_data.pop('segments', [])
         credits_data = validated_data.pop('credits', [])
+        relationships_data = validated_data.pop('relationships', [])
 
         issue_section = IssueSection.objects.create(**validated_data)
 
@@ -611,10 +683,33 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
                 c = Credit.objects.create(issue_section=issue_section, **credit)
                 c.renders.set(renders)
 
+        if relationships_data:
+            for rel in relationships_data:
+                if isinstance(rel, dict):
+                    to_section_id = rel.get('issue_section_id')
+                    label = rel.get('label')
+                    inverse_label = rel.get('inverse_label')
+                    order = rel.get('order', 0)
+
+                    if to_section_id and label:
+                        try:
+                            to_section = IssueSection.objects.get(id=to_section_id)
+                            IssueSectionRelationship.objects.create(
+                                from_issue_section=issue_section,
+                                to_issue_section=to_section,
+                                label=label,
+                                inverse_label=inverse_label,
+                                order=order
+                            )
+                        except IssueSection.DoesNotExist:
+                            pass
+
         return issue_section
 
     @transaction.atomic
     def update(self, instance: IssueSection, validated_data: dict) -> IssueSection:
+        relationships_data = validated_data.pop('relationships', None)
+
         for attr, value in list(validated_data.items()):
             if attr not in ['segments', 'credits']:
                 setattr(instance, attr, value)
@@ -633,6 +728,28 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
                 renders = credit.pop('renders', [])
                 c = Credit.objects.create(issue_section=instance, **credit)
                 c.renders.set(renders)
+
+        if relationships_data is not None:
+            instance.relationships_from.all().delete()
+            for rel in relationships_data:
+                if isinstance(rel, dict):
+                    to_section_id = rel.get('issue_section_id')
+                    label = rel.get('label')
+                    inverse_label = rel.get('inverse_label')
+                    order = rel.get('order', 0)
+
+                    if to_section_id and label:
+                        try:
+                            to_section = IssueSection.objects.get(id=to_section_id)
+                            IssueSectionRelationship.objects.create(
+                                from_issue_section=instance,
+                                to_issue_section=to_section,
+                                label=label,
+                                inverse_label=inverse_label,
+                                order=order
+                            )
+                        except IssueSection.DoesNotExist:
+                            pass
 
         return instance
 

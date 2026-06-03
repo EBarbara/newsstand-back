@@ -148,6 +148,10 @@ class IssueViewSet(viewsets.ModelViewSet):
             qs = qs.prefetch_related(
                 'issue_sections__section',
                 'issue_sections__segments',
+                'issue_sections__relationships_from__to_issue_section__issue__magazine',
+                'issue_sections__relationships_from__to_issue_section__section',
+                'issue_sections__relationships_to__from_issue_section__issue__magazine',
+                'issue_sections__relationships_to__from_issue_section__section',
                 'tags'
             )
 
@@ -622,7 +626,11 @@ class GlobalIssueSectionViewSet(viewsets.ReadOnlyModelViewSet):
         'section'
     ).prefetch_related(
         'segments', 
-        'credits__person'
+        'credits__person',
+        'relationships_from__to_issue_section__issue__magazine',
+        'relationships_from__to_issue_section__section',
+        'relationships_to__from_issue_section__issue__magazine',
+        'relationships_to__from_issue_section__section'
     ).order_by('-issue__publishing_date', 'order', 'id')
     
     serializer_class = GlobalIssueSectionSerializer
