@@ -214,6 +214,8 @@ class Person(models.Model):
     photo_focus_x = models.IntegerField(default=50, verbose_name='Photo Focus X (%)')
     photo_focus_y = models.IntegerField(default=50, verbose_name='Photo Focus Y (%)')
     aliases = models.JSONField(default=list, blank=True, verbose_name='Aliases')
+    is_group = models.BooleanField(default=False, verbose_name='Is Group')
+    members = models.JSONField(default=list, blank=True, verbose_name='Members')
     tags = models.ManyToManyField(Tag, blank=True, related_name='people')
 
     GENDER_CHOICES = [

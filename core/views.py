@@ -548,10 +548,11 @@ class PersonFilter(FilterSet):
     gender = ChoiceFilter(choices=Person.GENDER_CHOICES)
     gender_exclude = ChoiceFilter(field_name='gender', choices=Person.GENDER_CHOICES, exclude=True)
     country_exclude = CharFilter(field_name='country', lookup_expr='exact', exclude=True)
+    is_group = BooleanFilter(field_name='is_group')
     
     class Meta:
         model = Person
-        fields = ['gender', 'country']
+        fields = ['gender', 'country', 'is_group']
 
     def filter_tag(self, queryset, name, value):
         try:
@@ -577,7 +578,7 @@ class PersonViewSet(viewsets.ModelViewSet):
     serializer_class = PersonSerializer
     filter_backends = [django_filters.DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = PersonFilter
-    search_fields = ['name', 'aliases', 'disambiguation']
+    search_fields = ['name', 'aliases', 'disambiguation', 'members']
     ordering_fields = ['name', 'created_at', 'birth_date', 'country']
 
     def get_serializer_class(self):

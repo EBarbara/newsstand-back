@@ -162,7 +162,7 @@ class PersonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Person
         fields = ['id', 'name', 'photo', 'photo_focus_x', 'photo_focus_y', 'aliases', 'disambiguation', 'birth_date',
-                  'death_date', 'country', 'country_code', 'tags', 'gender', 'gender_display']
+                  'death_date', 'country', 'country_code', 'tags', 'gender', 'gender_display', 'is_group', 'members']
 
     def get_country_code(self, obj):
         from .utils import resolve_country_code
@@ -222,7 +222,9 @@ class PersonDetailSerializer(serializers.ModelSerializer):
             'tags',
             'tag_ids',
             'gender',
-            'gender_display'
+            'gender_display',
+            'is_group',
+            'members'
         ]
 
     def get_country_code(self, obj):
