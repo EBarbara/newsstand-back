@@ -53,6 +53,7 @@ class Magazine(models.Model):
     logo = models.ImageField(upload_to='logos/', null=True, blank=True)
 
     class Meta:
+        ordering = ['volume', 'name']
         constraints = [
             models.UniqueConstraint(
                 fields=['name', 'volume'],
@@ -62,6 +63,13 @@ class Magazine(models.Model):
         ]
 
     def save(self, *args, **kwargs):
+        if self.volume:
+            self.volume = self.volume.strip()
+            if not self.volume:
+                self.volume = None
+        else:
+            self.volume = None
+
         base_slug = slugify(self.name)
         expected_slug = f"{base_slug}-{slugify(self.volume)}" if self.volume else base_slug
         
