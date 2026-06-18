@@ -411,6 +411,7 @@ class PersonCreditSerializer(serializers.ModelSerializer):
     issue_cover_focus_x = serializers.SerializerMethodField()
     issue_cover_focus_y = serializers.SerializerMethodField()
     section_title = serializers.CharField(source='issue_section.title', read_only=True)
+    section_translated_title = serializers.CharField(source='issue_section.translated_title', read_only=True, allow_null=True)
     section_type = serializers.CharField(source='issue_section.section.name', read_only=True)
     start_page = serializers.SerializerMethodField()
     render_ids = serializers.PrimaryKeyRelatedField(
@@ -437,6 +438,7 @@ class PersonCreditSerializer(serializers.ModelSerializer):
             'issue_cover_focus_x',
             'issue_cover_focus_y',
             'section_title',
+            'section_translated_title',
             'section_type',
             'start_page',
             'render_ids',
@@ -524,6 +526,7 @@ def get_section_relationships(obj: IssueSection) -> list:
             'id': r.id,
             'issue_section_id': r.to_issue_section.id,
             'issue_section_title': r.to_issue_section.title,
+            'issue_section_translated_title': r.to_issue_section.translated_title,
             'section_name': r.to_issue_section.section.name,
             'magazine_name': r.to_issue_section.issue.magazine.name,
             'magazine_slug': r.to_issue_section.issue.magazine.slug,
@@ -550,6 +553,7 @@ def get_section_relationships(obj: IssueSection) -> list:
                 'id': r.id,
                 'issue_section_id': r.from_issue_section.id,
                 'issue_section_title': r.from_issue_section.title,
+                'issue_section_translated_title': r.from_issue_section.translated_title,
                 'section_name': r.from_issue_section.section.name,
                 'magazine_name': r.from_issue_section.issue.magazine.name,
                 'magazine_slug': r.from_issue_section.issue.magazine.slug,
@@ -577,6 +581,7 @@ class IssueSectionSerializer(serializers.ModelSerializer):
             'id',
             'section',
             'title',
+            'translated_title',
             'text_content',
             'segments',
             'credits',
@@ -607,7 +612,7 @@ class GlobalIssueSectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = IssueSection
         fields = [
-            'id', 'title', 'section_name', 'section_id', 'magazine_name', 'magazine_slug',
+            'id', 'title', 'translated_title', 'section_name', 'section_id', 'magazine_name', 'magazine_slug',
             'issue_edition', 'issue_volume', 'issue_date', 'issue_id', 'start_page',
             'first_page_image', 'first_page_type', 'credits', 'relationships', 'order'
         ]
@@ -649,7 +654,7 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = IssueSection
-        fields = ['id', 'section_id', 'title', 'text_content', 'order', 'segments', 'credits', 'relationships']
+        fields = ['id', 'section_id', 'title', 'translated_title', 'text_content', 'order', 'segments', 'credits', 'relationships']
 
     def validate_segments(self, value):
         for seg in value:
