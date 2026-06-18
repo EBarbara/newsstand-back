@@ -235,9 +235,10 @@ def process_cbz_file(
                 height=height,
             )
 
-            # mantém extensão original
-            ext = Path(img_filename).suffix.lower()
-            name = f"{i:04d}{ext}"
+            # mantém nome original com prefixo numérico para ordenação
+            original_name = Path(img_filename).name
+            safe_name = re.sub(r'[^a-zA-Z0-9_\.-]', '_', original_name)
+            name = f"{i:04d}_{safe_name}"
 
             render.image.save(
                 name,
