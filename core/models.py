@@ -41,9 +41,29 @@ class Tag(models.Model):
         ordering = ['name']
 
 
+class Publisher(models.Model):
+    name = models.CharField(max_length=255)
+    translated_name = models.CharField(max_length=255, null=True, blank=True)
+    country = models.CharField(max_length=255, null=True, blank=True)
+    website = models.URLField(null=True, blank=True)
+    logo = models.ImageField(upload_to='publishers/', null=True, blank=True)
+    aliases = models.JSONField(default=list, blank=True)
+    slug = models.SlugField(unique=True, db_index=True)
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        ordering = ['name']
+
+
 class Magazine(models.Model):
     name = models.CharField(max_length=255)
-    publisher = models.CharField(max_length=255, null=True, blank=True)
     language = models.CharField(max_length=255, null=True, blank=True)
     country = models.CharField(max_length=255, null=True, blank=True)
     slug = models.SlugField(unique=True, db_index=True)
@@ -51,6 +71,7 @@ class Magazine(models.Model):
     description = models.TextField(null=True, blank=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='magazines')
     logo = models.ImageField(upload_to='logos/', null=True, blank=True)
+    publishers = models.ManyToManyField(Publisher, through='MagazinePublisher', blank=True, related_name='magazines')
 
     class Meta:
         ordering = ['volume', 'name']
@@ -61,6 +82,7 @@ class Magazine(models.Model):
                 nulls_distinct=False
             )
         ]
+
 
     def save(self, *args, **kwargs):
         if self.volume:
@@ -87,6 +109,22 @@ class Magazine(models.Model):
     def __str__(self):
         volume_str = f' (Vol. {self.volume})' if self.volume else ''
         return f"{self.name}{volume_str}"
+
+
+class MagazinePublisher(models.Model):
+    magazine = models.ForeignKey(Magazine, on_delete=models.CASCADE, related_name='magazine_publishers')
+    publisher = models.ForeignKey(Publisher, on_delete=models.CASCADE, related_name='magazine_publishers')
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['start_date', 'publisher__name']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['magazine', 'publisher'],
+                name='unique_magazine_publisher'
+            )
+        ]
 
 
 class Issue(models.Model):
@@ -348,6 +386,7 @@ class CountryMapping(models.Model):
 @receiver(post_delete, sender=Person)
 @receiver(post_delete, sender=Magazine)
 @receiver(post_delete, sender=Tag)
+@receiver(post_delete, sender=Publisher)
 def delete_files_on_delete(sender, instance, **kwargs):
     """Deletes uploaded files from filesystem when the model instance is deleted."""
     for field in instance._meta.fields:

@@ -7,7 +7,7 @@ from rest_framework import serializers
 from rest_framework.request import Request
 
 from .models import Issue, IssueSection, Section, Person, Credit, Magazine, Render, SectionSegment, PersonLink, Tag, \
-    PersonRelationship, IssueSectionRelationship
+    PersonRelationship, IssueSectionRelationship, Publisher, MagazinePublisher
 from .utils import get_absolute_media_url, get_issue_cover, calculate_age_at_date
 
 
@@ -763,6 +763,96 @@ class IssueSectionWriteSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         return IssueSectionSerializer(instance, context=self.context).data
 
+class PublisherSimpleSerializer(serializers.ModelSerializer):
+    country_code = serializers.SerializerMethodField()
+    magazines_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Publisher
+        fields = ['id', 'name', 'translated_name', 'country', 'country_code', 'website', 'logo', 'aliases', 'slug', 'magazines_count']
+
+    def get_country_code(self, obj):
+        from .utils import resolve_country_code
+        return resolve_country_code(obj.country)
+
+    def get_magazines_count(self, obj):
+        return obj.magazine_publishers.count()
+
+
+class PublisherMagazineSerializer(serializers.ModelSerializer):
+    magazine_name = serializers.CharField(source='magazine.name', read_only=True)
+    magazine_slug = serializers.CharField(source='magazine.slug', read_only=True)
+    magazine_logo = serializers.SerializerMethodField()
+    start_date = serializers.DateField(read_only=True)
+    end_date = serializers.DateField(read_only=True)
+
+    class Meta:
+        model = MagazinePublisher
+        fields = ['magazine_name', 'magazine_slug', 'magazine_logo', 'start_date', 'end_date']
+
+    def get_magazine_logo(self, obj):
+        try:
+            if obj.magazine.logo:
+                request = self.context.get('request')
+                return get_absolute_media_url(obj.magazine.logo.url, request)
+        except Exception:
+            pass
+        return None
+
+
+class PublisherDetailSerializer(serializers.ModelSerializer):
+    magazines = serializers.SerializerMethodField()
+    country_code = serializers.SerializerMethodField()
+    logo = serializers.ImageField(required=False, allow_null=True)
+    magazines_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Publisher
+        fields = [
+            'id', 'name', 'translated_name', 'country', 'country_code', 'website', 
+            'logo', 'aliases', 'slug', 'magazines', 'magazines_count'
+        ]
+
+    def get_country_code(self, obj):
+        from .utils import resolve_country_code
+        return resolve_country_code(obj.country)
+
+    def get_magazines_count(self, obj):
+        return obj.magazine_publishers.count()
+
+    def get_magazines(self, obj):
+        return PublisherMagazineSerializer(obj.magazine_publishers.all(), many=True, context=self.context).data
+
+    def to_internal_value(self, data):
+        if hasattr(data, 'copy'):
+            data = data.copy()
+
+        aliases = data.get('aliases')
+        if isinstance(aliases, str):
+            try:
+                parsed_aliases = json.loads(aliases)
+                if hasattr(data, 'setlist'):
+                    data.setlist('aliases', parsed_aliases)
+                else:
+                    data['aliases'] = parsed_aliases
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return super().to_internal_value(data)
+
+
+class MagazinePublisherSerializer(serializers.ModelSerializer):
+    publisher = PublisherSimpleSerializer(read_only=True)
+    publisher_id = serializers.PrimaryKeyRelatedField(
+        queryset=Publisher.objects.all(),
+        source='publisher',
+        write_only=True
+    )
+
+    class Meta:
+        model = MagazinePublisher
+        fields = ['publisher', 'publisher_id', 'start_date', 'end_date']
+
+
 class MagazineSerializer(serializers.ModelSerializer):
     tags = serializers.SerializerMethodField()
     tag_ids = serializers.PrimaryKeyRelatedField(
@@ -776,11 +866,12 @@ class MagazineSerializer(serializers.ModelSerializer):
     periodic_issues_count = serializers.SerializerMethodField()
     special_issues_count = serializers.SerializerMethodField()
     country_code = serializers.SerializerMethodField()
+    publishers = MagazinePublisherSerializer(source='magazine_publishers', many=True, read_only=True)
 
     class Meta:
         model = Magazine
         fields = [
-            'id', 'name', 'slug', 'publisher', 'language', 'country', 'country_code',
+            'id', 'name', 'slug', 'publishers', 'language', 'country', 'country_code',
             'volume', 'description', 'tags', 'tag_ids', 'logo', 'issues_count', 
             'periodic_issues_count', 'special_issues_count'
         ]
@@ -828,11 +919,33 @@ class MagazineSerializer(serializers.ModelSerializer):
                     else:
                         data['tag_ids'] = parsed_ids
 
+        publishers = data.get('publishers')
+        if isinstance(publishers, str):
+            try:
+                parsed_publishers = json.loads(publishers)
+                if hasattr(data, 'setlist'):
+                    data.setlist('publishers', parsed_publishers)
+                else:
+                    data['publishers'] = parsed_publishers
+            except (json.JSONDecodeError, TypeError):
+                pass
+
         return super().to_internal_value(data)
 
     @transaction.atomic
     def update(self, instance, validated_data):
         tags = validated_data.pop('tags', None)
+        
+        publishers_raw = self.initial_data.get('publishers')
+        if isinstance(publishers_raw, str):
+            try:
+                publishers_data = json.loads(publishers_raw)
+            except Exception:
+                publishers_data = None
+        elif isinstance(publishers_raw, list):
+            publishers_data = publishers_raw
+        else:
+            publishers_data = None
         
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -841,15 +954,62 @@ class MagazineSerializer(serializers.ModelSerializer):
         if tags is not None:
             instance.tags.set(tags)
             
+        if publishers_data is not None:
+            instance.magazine_publishers.all().delete()
+            for pub_item in publishers_data:
+                pub_id = pub_item.get('publisher_id')
+                if pub_id:
+                    try:
+                        publisher = Publisher.objects.get(id=pub_id)
+                        start_date = pub_item.get('start_date') or None
+                        end_date = pub_item.get('end_date') or None
+                        MagazinePublisher.objects.create(
+                            magazine=instance,
+                            publisher=publisher,
+                            start_date=start_date,
+                            end_date=end_date
+                        )
+                    except Publisher.DoesNotExist:
+                        pass
+            
         return instance
 
     @transaction.atomic
     def create(self, validated_data):
         tags = validated_data.pop('tags', None)
+        
+        publishers_raw = self.initial_data.get('publishers')
+        if isinstance(publishers_raw, str):
+            try:
+                publishers_data = json.loads(publishers_raw)
+            except Exception:
+                publishers_data = None
+        elif isinstance(publishers_raw, list):
+            publishers_data = publishers_raw
+        else:
+            publishers_data = None
+
         instance = Magazine.objects.create(**validated_data)
         
         if tags is not None:
             instance.tags.set(tags)
+            
+        if publishers_data is not None:
+            for pub_item in publishers_data:
+                pub_id = pub_item.get('publisher_id')
+                if pub_id:
+                    try:
+                        publisher = Publisher.objects.get(id=pub_id)
+                        start_date = pub_item.get('start_date') or None
+                        end_date = pub_item.get('end_date') or None
+                        MagazinePublisher.objects.create(
+                            magazine=instance,
+                            publisher=publisher,
+                            start_date=start_date,
+                            end_date=end_date
+                        )
+                    except Publisher.DoesNotExist:
+                        pass
             
         return instance
 

@@ -12,11 +12,11 @@ from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 
-from .models import Issue, Magazine, IssueSection, SectionSegment, Render, Tag, Section, Person, Credit
+from .models import Issue, Magazine, IssueSection, SectionSegment, Render, Tag, Section, Person, Credit, Publisher
 from .pagination import StandardResultsSetPagination
 from .serializers import IssueListSerializer, IssueReaderSerializer, MagazineSerializer, TagSerializer, TagDetailSerializer, \
     SectionSerializer, IssueSectionSerializer, IssueSectionWriteSerializer, PersonSerializer, PersonDetailSerializer, \
-    PersonCreditSerializer, GlobalIssueSectionSerializer
+    PersonCreditSerializer, GlobalIssueSectionSerializer, PublisherSimpleSerializer, PublisherDetailSerializer
 from .services import process_cbz_file
 
 
@@ -487,13 +487,26 @@ class IssueViewSet(viewsets.ModelViewSet):
 
         return Response(IssueReaderSerializer(issue, context={'request': request}).data)
 
+class PublisherViewSet(viewsets.ModelViewSet):
+    queryset = Publisher.objects.all().order_by('name')
+    lookup_field = 'slug'
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    filter_backends = [django_filters.DjangoFilterBackend, filters.SearchFilter]
+    search_fields = ['name', 'translated_name', 'aliases']
+
+    def get_serializer_class(self):
+        if self.action in ['retrieve', 'update', 'partial_update']:
+            return PublisherDetailSerializer
+        return PublisherSimpleSerializer
+
+
 class MagazineViewSet(viewsets.ModelViewSet):
     queryset = Magazine.objects.all()
     serializer_class = MagazineSerializer
     lookup_field = 'slug'
     lookup_url_kwarg = 'magazine_slug'
     filter_backends = [django_filters.DjangoFilterBackend, filters.SearchFilter]
-    search_fields = ['name', 'publisher', 'description']
+    search_fields = ['name', 'publishers__name', 'description']
 
     def get_queryset(self):
         qs = super().get_queryset()

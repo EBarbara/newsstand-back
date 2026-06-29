@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Magazine, Issue, Render, Section, IssueSection, Person, PersonLink, Credit, Tag, CountryMapping, IssueSectionRelationship
+from .models import Magazine, Issue, Render, Section, IssueSection, Person, PersonLink, Credit, Tag, CountryMapping, IssueSectionRelationship, Publisher, MagazinePublisher
 
 
 @admin.register(CountryMapping)
@@ -16,11 +16,21 @@ class TagAdmin(admin.ModelAdmin):
     prepopulated_fields = {'slug': ('name',)}
     search_fields = ('name', 'parent__name', 'description')
 
+@admin.register(Publisher)
+class PublisherAdmin(admin.ModelAdmin):
+    list_display = ('name', 'country', 'website')
+    prepopulated_fields = {'slug': ('name',)}
+    search_fields = ('name', 'translated_name', 'aliases')
+
 @admin.register(Magazine)
 class MagazineAdmin(admin.ModelAdmin):
-    list_display = ('name', 'publisher', 'country')
+    list_display = ('name', 'display_publishers', 'country')
     prepopulated_fields = {'slug': ('name',)}
     filter_horizontal = ('tags',)
+
+    def display_publishers(self, obj):
+        return ", ".join([p.name for p in obj.publishers.all()])
+    display_publishers.short_description = 'Publishers'
 
 @admin.register(Issue)
 class IssueAdmin(admin.ModelAdmin):
@@ -41,4 +51,5 @@ admin.site.register(Credit)
 admin.site.register(PersonLink)
 admin.site.register(Render)
 admin.site.register(IssueSectionRelationship)
+admin.site.register(MagazinePublisher)
 
