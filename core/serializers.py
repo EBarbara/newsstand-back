@@ -825,22 +825,6 @@ class PublisherDetailSerializer(serializers.ModelSerializer):
     def get_magazines(self, obj):
         return PublisherMagazineSerializer(obj.magazine_publishers.all(), many=True, context=self.context).data
 
-    def to_internal_value(self, data):
-        if hasattr(data, 'copy'):
-            data = data.copy()
-
-        aliases = data.get('aliases')
-        if isinstance(aliases, str):
-            try:
-                parsed_aliases = json.loads(aliases)
-                if hasattr(data, 'setlist'):
-                    data.setlist('aliases', parsed_aliases)
-                else:
-                    data['aliases'] = parsed_aliases
-            except (json.JSONDecodeError, TypeError):
-                pass
-        return super().to_internal_value(data)
-
 
 class MagazinePublisherSerializer(serializers.ModelSerializer):
     publisher = PublisherSimpleSerializer(read_only=True)
