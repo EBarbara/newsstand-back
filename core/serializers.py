@@ -769,7 +769,7 @@ class PublisherSimpleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Publisher
-        fields = ['id', 'name', 'translated_name', 'country', 'country_code', 'website', 'logo', 'aliases', 'slug', 'magazines_count']
+        fields = ['id', 'name', 'translated_name', 'country', 'country_code', 'website', 'logo', 'aliases', 'description', 'slug', 'magazines_count']
 
     def get_country_code(self, obj):
         from .utils import resolve_country_code
@@ -810,7 +810,7 @@ class PublisherDetailSerializer(serializers.ModelSerializer):
         model = Publisher
         fields = [
             'id', 'name', 'translated_name', 'country', 'country_code', 'website', 
-            'logo', 'aliases', 'slug', 'magazines', 'magazines_count'
+            'logo', 'aliases', 'description', 'slug', 'magazines', 'magazines_count'
         ]
 
     def get_country_code(self, obj):

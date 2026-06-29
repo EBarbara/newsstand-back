@@ -48,6 +48,7 @@ class Publisher(models.Model):
     website = models.URLField(null=True, blank=True)
     logo = models.ImageField(upload_to='publishers/', null=True, blank=True)
     aliases = models.JSONField(default=list, blank=True)
+    description = models.TextField(null=True, blank=True)
     slug = models.SlugField(unique=True, db_index=True)
 
     def save(self, *args, **kwargs):
