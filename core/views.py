@@ -684,7 +684,7 @@ class PersonViewSet(viewsets.ModelViewSet):
             sections_by_id = {
                 s.id: s for s in IssueSection.objects.filter(id__in=all_visited_nodes).select_related(
                     'issue__magazine', 'section'
-                ).prefetch_related('segments', 'renders')
+                ).prefetch_related('segments')
             }
 
             component_originals = {}
