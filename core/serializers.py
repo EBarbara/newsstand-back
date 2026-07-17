@@ -421,6 +421,8 @@ class PersonCreditSerializer(serializers.ModelSerializer):
     )
     issue_date = serializers.DateField(source='issue_section.issue.publishing_date', read_only=True)
     age_at_issue = serializers.SerializerMethodField()
+    issue_section_id = serializers.IntegerField(source='issue_section.id', read_only=True)
+    republications = serializers.SerializerMethodField()
 
     class Meta:
         model = Credit
@@ -442,8 +444,13 @@ class PersonCreditSerializer(serializers.ModelSerializer):
             'section_type',
             'start_page',
             'render_ids',
-            'age_at_issue'
+            'age_at_issue',
+            'issue_section_id',
+            'republications'
         ]
+
+    def get_republications(self, obj):
+        return getattr(obj, 'republications_data', [])
 
     def get_start_page(self, obj):
         # If the credit is anchored to specific pages, return the order of the first one

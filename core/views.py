@@ -605,6 +605,9 @@ class PersonViewSet(viewsets.ModelViewSet):
         credits_data = Credit.objects.filter(person=person).select_related(
             'issue_section__issue__magazine',
             'issue_section__section'
+        ).prefetch_related(
+            'renders',
+            'issue_section__segments'
         ).order_by('-issue_section__issue__publishing_date')
 
         importance_param = request.query_params.get('importance')
@@ -615,6 +618,165 @@ class PersonViewSet(viewsets.ModelViewSet):
                     credits_data = credits_data.filter(importance__in=importances)
             except ValueError:
                 pass
+
+        # Convert to list to execute grouping/collapsing in Python before pagination
+        credits_list = list(credits_data)
+
+        if credits_list:
+            import datetime
+            from core.models import IssueSectionRelationship
+
+            issue_section_ids = [c.issue_section_id for c in credits_list]
+
+            adjacency = {}
+            visited = set()
+            current_nodes = set(issue_section_ids)
+
+            while current_nodes:
+                relationships = IssueSectionRelationship.objects.filter(
+                    Q(from_issue_section_id__in=current_nodes) | Q(to_issue_section_id__in=current_nodes)
+                ).values_list('from_issue_section_id', 'to_issue_section_id')
+
+                new_nodes = set()
+                for from_id, to_id in relationships:
+                    if from_id not in adjacency:
+                        adjacency[from_id] = set()
+                    if to_id not in adjacency:
+                        adjacency[to_id] = set()
+                    adjacency[from_id].add(to_id)
+                    adjacency[to_id].add(from_id)
+
+                    if from_id not in visited and from_id not in current_nodes:
+                        new_nodes.add(from_id)
+                    if to_id not in visited and to_id not in current_nodes:
+                        new_nodes.add(to_id)
+
+                visited.update(current_nodes)
+                current_nodes = new_nodes
+
+            # Find connected components of all visited nodes
+            components = []
+            visited_nodes = set()
+            all_visited_nodes = list(visited)
+            for node in all_visited_nodes:
+                if node in visited_nodes:
+                    continue
+                component = set()
+                queue = [node]
+                while queue:
+                    curr = queue.pop(0)
+                    if curr in component:
+                        continue
+                    component.add(curr)
+                    visited_nodes.add(curr)
+                    for neighbor in adjacency.get(curr, []):
+                        if neighbor not in component:
+                            queue.append(neighbor)
+                components.append(component)
+
+            section_to_component = {}
+            for idx, comp in enumerate(components):
+                for node in comp:
+                    section_to_component[node] = idx
+
+            # For each component, find the "original" section.
+            # The original section is the one in the component with the earliest publishing date.
+            sections_by_id = {
+                s.id: s for s in IssueSection.objects.filter(id__in=all_visited_nodes).select_related(
+                    'issue__magazine', 'section'
+                ).prefetch_related('segments', 'renders')
+            }
+
+            component_originals = {}
+            for idx, comp in enumerate(components):
+                comp_sections = [sections_by_id[nid] for nid in comp if nid in sections_by_id]
+                if comp_sections:
+                    comp_sections.sort(key=lambda s: (s.issue.publishing_date or datetime.date.max, s.id))
+                    component_originals[idx] = comp_sections[0].id
+
+            # Group person's credits by component
+            person_sections_by_component = {}
+            credits_by_section = {}
+            for c in credits_list:
+                sec_id = c.issue_section_id
+                if sec_id not in credits_by_section:
+                    credits_by_section[sec_id] = []
+                credits_by_section[sec_id].append(c)
+
+                comp_idx = section_to_component.get(sec_id)
+                if comp_idx is not None:
+                    if comp_idx not in person_sections_by_component:
+                        person_sections_by_component[comp_idx] = set()
+                    person_sections_by_component[comp_idx].add(sec_id)
+
+            # Determine which credits to keep and which to collapse/attach
+            final_credits = []
+            processed_components = set()
+
+            for c in credits_list:
+                sec_id = c.issue_section_id
+                comp_idx = section_to_component.get(sec_id)
+
+                if comp_idx is None or len(person_sections_by_component.get(comp_idx, [])) <= 1:
+                    # Not in a multi-section component for this person
+                    final_credits.append(c)
+                else:
+                    if comp_idx in processed_components:
+                        continue
+                    processed_components.add(comp_idx)
+
+                    # Determine representative original section for this person
+                    rep_orig = component_originals[comp_idx]
+                    if rep_orig not in person_sections_by_component[comp_idx]:
+                        p_sections = [sections_by_id[nid] for nid in person_sections_by_component[comp_idx]]
+                        p_sections.sort(key=lambda s: (s.issue.publishing_date or datetime.date.max, s.id))
+                        rep_orig = p_sections[0].id
+
+                    # Keep all credits on the representative original section
+                    primary_credits = credits_by_section.get(rep_orig, [])
+                    if not primary_credits:
+                        continue
+
+                    # Gather other sections in this component where the person has credits
+                    other_section_ids = person_sections_by_component[comp_idx] - {rep_orig}
+
+                    # Create the serialized list of republications
+                    republications = []
+                    for o_sec_id in other_section_ids:
+                        o_sec_credits = credits_by_section.get(o_sec_id, [])
+                        for o_credit in o_sec_credits:
+                            first_render = o_credit.renders.order_by('order').first()
+                            start_page = None
+                            if first_render:
+                                start_page = first_render.order
+                            else:
+                                first_segment = o_credit.issue_section.segments.order_by('start_page').first()
+                                start_page = first_segment.start_page if first_segment else None
+
+                            republications.append({
+                                'id': o_credit.id,
+                                'role': o_credit.role,
+                                'importance': o_credit.importance,
+                                'issue_section_id': o_credit.issue_section.id,
+                                'issue_section_title': o_credit.issue_section.title,
+                                'issue_section_translated_title': o_credit.issue_section.translated_title,
+                                'section_name': o_credit.issue_section.section.name,
+                                'magazine_name': o_credit.issue_section.issue.magazine.name,
+                                'magazine_slug': o_credit.issue_section.issue.magazine.slug,
+                                'issue_edition': o_credit.issue_section.issue.edition,
+                                'issue_volume': o_credit.issue_section.issue.volume,
+                                'issue_id': o_credit.issue_section.issue.id,
+                                'start_page': start_page,
+                            })
+
+                    # Sort republications by publishing date / ID as well
+                    republications.sort(key=lambda r: (sections_by_id[r['issue_section_id']].issue.publishing_date or datetime.date.max, r['issue_section_id']))
+
+                    for p_credit in primary_credits:
+                        p_credit.republications_data = republications
+                        final_credits.append(p_credit)
+
+            credits_data = final_credits
 
         page = self.paginate_queryset(credits_data)
         if page is not None:
